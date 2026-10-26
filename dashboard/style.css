@@ -181,3 +181,50 @@ div[data-testid="stMetricValue"] {
     border-radius: 6px;
     border: 1px solid rgba(59, 130, 246, 0.2);
 }
+
+/* Custom Tabs Styling */
+button[data-baseweb="tab"] {
+    font-size: 0.92rem !important;
+    font-weight: 600 !important;
+    color: #94A3B8 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 6px 6px 0 0 !important;
+    transition: all 0.2s ease !important;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #38BDF8 !important;
+    border-bottom: 2px solid #38BDF8 !important;
+}
+
+button[data-baseweb="tab"]:hover {
+    color: #F8FAFC !important;
+}
+
+/* Download Button Styling */
+div.stDownloadButton > button {
+    background-color: #1E293B !important;
+    color: #38BDF8 !important;
+    border: 1px solid #3B82F6 !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    transition: all 0.2s ease !important;
+}
+
+div.stDownloadButton > button:hover {
+    background-color: #2563EB !important;
+    color: #FFFFFF !important;
+    border-color: #60A5FA !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+}
+
+/* Expander Styling */
+div[data-testid="stExpander"] {
+    background-color: #1E293B !important;
+    border: 1px solid #334155 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    margin-top: 1rem !important;
+    margin-bottom: 1.5rem !important;
+}

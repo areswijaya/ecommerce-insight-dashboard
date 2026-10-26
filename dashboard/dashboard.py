@@ -68,14 +68,15 @@ def apply_plot_theme(fig, title="", x_title="", y_title="", margin=None):
         paper_bgcolor="rgba(0,0,0,0)",
         margin=margin,
         font=dict(color="#F8FAFC", family="Inter, sans-serif"),
-        hoverlabel=dict(bgcolor="#1E293B", font_color="#F8FAFC", font_size=12)
+        hoverlabel=dict(bgcolor="#1E293B", font_color="#F8FAFC", font_size=12),
+        separators=",."
     )
     fig.update_xaxes(title_text=x_title, showgrid=True, gridcolor="rgba(148, 163, 184, 0.15)", automargin=True)
     fig.update_yaxes(title_text=y_title, showgrid=True, gridcolor="rgba(148, 163, 184, 0.15)", automargin=True)
     return fig
 
 # ----------------------------------------------------------
-# DATA LOADER (WITH CACHING)
+# DATA LOADER (WITH CACHING & PRE-CALCULATED DATES)
 # ----------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def load_data():
@@ -96,6 +97,7 @@ def load_data():
         
     df = pd.read_csv(file_path)
     df["order_purchase_timestamp"] = pd.to_datetime(df["order_purchase_timestamp"])
+    df["order_purchase_date"] = df["order_purchase_timestamp"].dt.date
     df["order_delivered_customer_date"] = pd.to_datetime(df["order_delivered_customer_date"])
     df["order_estimated_delivery_date"] = pd.to_datetime(df["order_estimated_delivery_date"])
     df["is_delayed"] = df["is_delayed"].astype(bool)
@@ -113,33 +115,55 @@ if df_raw is None:
 # ----------------------------------------------------------
 st.sidebar.title("⚙️ Filter Analisis")
 
-# 1. Filter Rentang Waktu (Aman dari Single-Date Crash)
-min_date = df_raw["order_purchase_timestamp"].min().date()
-max_date = df_raw["order_purchase_timestamp"].max().date()
+# 1. Filter Rentang Waktu (Preset Cepat & Proteksi Crash)
+min_date = df_raw["order_purchase_date"].min()
+max_date = df_raw["order_purchase_date"].max()
 
 st.sidebar.subheader("🗓️ Periode Transaksi")
-date_selection = st.sidebar.date_input(
-    "Pilih Rentang Tanggal",
-    value=(min_date, max_date),
-    min_value=min_date,
-    max_value=max_date,
-    help="Data dibatasi pada periode operasional stabil (2017-01-01 s.d. 2018-08-31)."
+period_preset = st.sidebar.selectbox(
+    "Preset Periode Analisis:",
+    options=[
+        "Seluruh Periode (Jan 2017 – Agu 2018)",
+        "Tahun 2017 (Fase Ekspansi & Puncak Black Friday)",
+        "Tahun 2018 (Fase Kematangan Pasar)",
+        "Kustom (Rentang Tanggal Bebas)"
+    ],
+    index=0,
+    help="Gunakan preset periode cepat atau pilih 'Kustom' untuk menentukan rentang tanggal manual."
 )
 
-# Penanganan pemilihan satu tanggal
-if isinstance(date_selection, (tuple, list)):
-    if len(date_selection) == 2:
-        start_date, end_date = date_selection
-    elif len(date_selection) == 1:
-        start_date = end_date = date_selection[0]
-        st.sidebar.info("💡 Memilih satu tanggal. Menampilkan transaksi pada hari tersebut.")
+if period_preset == "Tahun 2017 (Fase Ekspansi & Puncak Black Friday)":
+    start_date = pd.to_datetime("2017-01-01").date()
+    end_date = pd.to_datetime("2017-12-31").date()
+    st.sidebar.caption(f"📅 Periode: **{start_date.strftime('%d %b %Y')}** s.d. **{end_date.strftime('%d %b %Y')}**")
+elif period_preset == "Tahun 2018 (Fase Kematangan Pasar)":
+    start_date = pd.to_datetime("2018-01-01").date()
+    end_date = pd.to_datetime("2018-08-31").date()
+    st.sidebar.caption(f"📅 Periode: **{start_date.strftime('%d %b %Y')}** s.d. **{end_date.strftime('%d %b %Y')}**")
+elif period_preset == "Kustom (Rentang Tanggal Bebas)":
+    date_selection = st.sidebar.date_input(
+        "Pilih Rentang Tanggal Manual:",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date,
+        help="Data dibatasi pada periode operasional stabil (2017-01-01 s.d. 2018-08-31)."
+    )
+    if isinstance(date_selection, (tuple, list)):
+        if len(date_selection) == 2:
+            start_date, end_date = date_selection
+        elif len(date_selection) == 1:
+            start_date = end_date = date_selection[0]
+            st.sidebar.info("💡 Memilih satu tanggal. Menampilkan transaksi pada hari tersebut.")
+        else:
+            start_date, end_date = min_date, max_date
     else:
-        start_date, end_date = min_date, max_date
-else:
-    start_date = end_date = date_selection
+        start_date = end_date = date_selection
+else:  # Seluruh Periode Default
+    start_date = min_date
+    end_date = max_date
+    st.sidebar.caption(f"📅 Periode: **{start_date.strftime('%d %b %Y')}** s.d. **{end_date.strftime('%d %b %Y')}** (20 Bulan Penuh)")
 
 # 2. Filter Kategori Produk (Mencegah Ledakan 72 Tag Chip)
-st.sidebar.subheader("📦 Kategori Produk")
 all_categories = sorted(df_raw["product_category_name_english"].dropna().unique().tolist())
 
 all_categories_mode = st.sidebar.checkbox(f"Analisis Seluruh Kategori ({len(all_categories)} Kategori)", value=True)
@@ -161,7 +185,7 @@ st.sidebar.caption("👨‍💼 **Portfolio:** Junior Data Analyst  \n🎓 **Bac
 # ----------------------------------------------------------
 # APPLY FILTERS
 # ----------------------------------------------------------
-mask_date = (df_raw["order_purchase_timestamp"].dt.date >= start_date) & (df_raw["order_purchase_timestamp"].dt.date <= end_date)
+mask_date = (df_raw["order_purchase_date"] >= start_date) & (df_raw["order_purchase_date"] <= end_date)
 mask_cat = df_raw["product_category_name_english"].isin(selected_categories)
 
 df_filtered = df_raw[mask_date & mask_cat].copy()
@@ -555,7 +579,11 @@ corr_spearman = df_reviewed["actual_delivery_days"].rank().corr(df_reviewed["rev
 col_d1, col_d2 = st.columns([6, 6])
 
 with col_d1:
-    tab_rating, tab_prop = st.tabs(["⭐ Rata-rata Skor Ulasan", "🚨 Proporsi Ulasan Bintang 1"])
+    tab_rating, tab_prop, tab_dist = st.tabs([
+        "⭐ Rata-rata Skor Ulasan", 
+        "🚨 Proporsi Ulasan Bintang 1",
+        "📊 Distribusi Lengkap (1–5 ⭐)"
+    ])
     
     n_ontime = len(ontime_df)
     n_late = len(late_df)
@@ -616,6 +644,40 @@ with col_d1:
         fig_prop.update_xaxes(showgrid=False)
         st.plotly_chart(fig_prop, width="stretch")
         st.caption("ℹ️ *Bukti Lonjakan Ulasan Negatif:* Keterlambatan kalender meningkatkan risiko ulasan bintang 1 secara drastis (hingga >8x lipat).")
+
+    with tab_dist:
+        # Grouped Bar Chart: Distribusi Lengkap Seluruh Skor 1 s.d. 5 Bintang
+        dist_data = []
+        for status_label, sub_df in [("Tepat Waktu", ontime_df), ("Terlambat", late_df)]:
+            if not sub_df.empty:
+                counts = sub_df["review_score"].round().value_counts(normalize=True) * 100
+                for score in [1, 2, 3, 4, 5]:
+                    pct_val = counts.get(float(score), 0.0)
+                    dist_data.append({
+                        "Status Pengiriman": status_label,
+                        "Skor Bintang": f"{score} ⭐",
+                        "Persentase": round(pct_val, 1),
+                        "Label Text": f"{pct_val:.1f}%"
+                    })
+        
+        df_chart_dist = pd.DataFrame(dist_data)
+        if not df_chart_dist.empty:
+            fig_dist = px.bar(
+                df_chart_dist,
+                x="Skor Bintang",
+                y="Persentase",
+                color="Status Pengiriman",
+                barmode="group",
+                color_discrete_map={"Tepat Waktu": "#10B981", "Terlambat": "#EF4444"},
+                text="Label Text",
+                labels={"Persentase": "Proporsi Pesanan (%)", "Skor Bintang": "Skor Ulasan"}
+            )
+            fig_dist.update_traces(textposition="outside")
+            apply_plot_theme(fig_dist, title="Sebaran Seluruh Skor Ulasan (1–5 ⭐): Tepat Waktu vs Terlambat", y_title="Proporsi Pesanan (%)", margin=dict(l=65, r=30, t=55, b=45))
+            max_p = df_chart_dist["Persentase"].max() if not df_chart_dist.empty else 60
+            fig_dist.update_layout(yaxis_range=[0, max(75, max_p * 1.18)], legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(fig_dist, width="stretch")
+            st.caption("ℹ️ *Pergeseran Distribusi:* Pesanan tepat waktu didominasi oleh bintang 5 (62,2%), sedangkan saat pesanan melewati estimasi kalender, ulasan langsung anjlok ke bintang 1 (53,7%).")
 
 with col_d2:
     # Boxplot of Delivery Days by Review Score (Rentang 0–45 hari untuk menyorot kuartil)
@@ -715,8 +777,63 @@ with col_a3:
     </div>
     """, unsafe_allow_html=True)
 
+st.markdown("<hr style='margin: 1.5rem 0; border: none; height: 1px; background-color: #334155;'/>", unsafe_allow_html=True)
+
 # ----------------------------------------------------------
-# SECTION 5: PROFESSIONAL AUTHOR CREDITS (FOOTER)
+# SECTION 5: DATA DRILLDOWN & AUDIT TRAIL
+# ----------------------------------------------------------
+st.subheader("🔍 5. Eksplorasi & Audit Data Terfilter (Data Drilldown)")
+st.caption("Inspeksi granularitas data transaksi, ringkasan tabel agregasi analitis, dan unduh dataset terfilter dalam format CSV.")
+
+with st.expander("📂 Buka Panel Eksplorasi Data & Unduh CSV", expanded=False):
+    tab_sample, tab_cat_table, tab_monthly_table = st.tabs([
+        "📋 Sampel Transaksi (10 Baris)", 
+        "📦 Tabel Agregasi Kategori Produk", 
+        "📈 Tabel Agregasi Bulanan"
+    ])
+    
+    with tab_sample:
+        display_cols = [
+            "order_id", "order_purchase_timestamp", "product_category_name_english",
+            "price", "freight_value", "total_order_value", "actual_delivery_days",
+            "is_delayed", "review_score"
+        ]
+        st.dataframe(df_filtered[display_cols].head(10), hide_index=True)
+        csv_sample = df_filtered[display_cols].to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Unduh Data Transaksi Terfilter (CSV)",
+            data=csv_sample,
+            file_name="filtered_ecommerce_transactions.csv",
+            mime="text/csv",
+            help="Unduh data transaksi terfilter berdasarkan rentang tanggal dan kategori yang dipilih."
+        )
+        
+    with tab_cat_table:
+        cat_export = cat_agg[["product_category_name_english", "total_revenue", "total_orders", "total_items", "aov", "cum_pct"]].copy()
+        cat_export.columns = ["Kategori Produk", "Total Revenue (BRL)", "Total Pesanan", "Total Item", "AOV (BRL)", "Kumulatif (%)"]
+        st.dataframe(cat_export.head(30), hide_index=True)
+        csv_cat = cat_export.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Unduh Ringkasan Kategori Pareto (CSV)",
+            data=csv_cat,
+            file_name="category_pareto_summary.csv",
+            mime="text/csv"
+        )
+        
+    with tab_monthly_table:
+        monthly_export = monthly_agg[["order_year_month", "revenue", "orders", "aov", "mom_growth"]].copy()
+        monthly_export.columns = ["Tahun-Bulan", "Net Revenue (BRL)", "Total Pesanan", "AOV (BRL)", "MoM Growth (%)"]
+        st.dataframe(monthly_export, hide_index=True)
+        csv_monthly = monthly_export.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Unduh Ringkasan Tren Bulanan (CSV)",
+            data=csv_monthly,
+            file_name="monthly_revenue_trend.csv",
+            mime="text/csv"
+        )
+
+# ----------------------------------------------------------
+# SECTION 6: PROFESSIONAL AUTHOR CREDITS (FOOTER)
 # ----------------------------------------------------------
 st.markdown("""
 <div class="credit-container">

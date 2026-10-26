@@ -51,7 +51,7 @@ E-commerce marketplace modern menghadapi tantangan ganda: memacu pertumbuhan oms
 Struktur repositori ini memisahkan secara jelas antara **Jalur Demonstrasi Analisis (*Data Science Pipeline*)** dan **Jalur Eksekusi Web (*Web Dashboard Runtime*)**:
 
 ```
-submission/
+ecommerce-insight-dashboard/
 ├── .streamlit/
 │   └── config.toml               # [DEPLOYMENT] Konfigurasi dark mode Streamlit Cloud
 │
