@@ -548,9 +548,9 @@ on_time_avg = ontime_df["review_score"].mean() if not ontime_df.empty else None
 late_avg = late_df["review_score"].mean() if not late_df.empty else None
 satisfaction_gap = (on_time_avg - late_avg) if (on_time_avg is not None and late_avg is not None) else None
 
-# Korelasi statistik (Pearson & Spearman)
+# Korelasi statistik (Pearson & Spearman via rank correlation tanpa dependensi eksternal)
 corr_pearson = df_reviewed["actual_delivery_days"].corr(df_reviewed["review_score"], method="pearson") if len(df_reviewed) > 1 else None
-corr_spearman = df_reviewed["actual_delivery_days"].corr(df_reviewed["review_score"], method="spearman") if len(df_reviewed) > 1 else None
+corr_spearman = df_reviewed["actual_delivery_days"].rank().corr(df_reviewed["review_score"].rank()) if len(df_reviewed) > 1 else None
 
 col_d1, col_d2 = st.columns([6, 6])
 

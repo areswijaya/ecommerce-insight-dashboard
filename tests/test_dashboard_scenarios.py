@@ -60,7 +60,7 @@ def simulate_pipeline(df_raw, start_date, end_date, selected_categories):
     gap = (on_time_avg - late_avg) if (on_time_avg is not None and late_avg is not None) else None
     
     corr_p = df_reviewed["actual_delivery_days"].corr(df_reviewed["review_score"], method="pearson") if len(df_reviewed) > 1 else None
-    corr_s = df_reviewed["actual_delivery_days"].corr(df_reviewed["review_score"], method="spearman") if len(df_reviewed) > 1 else None
+    corr_s = df_reviewed["actual_delivery_days"].rank().corr(df_reviewed["review_score"].rank()) if len(df_reviewed) > 1 else None
     
     return {
         "empty": False,
