@@ -1,0 +1,183 @@
+/* dashboard/style.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+html, body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#MainMenu, footer {
+    visibility: hidden;
+}
+
+/* Header Banner */
+.main-banner {
+    background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 50%, #3B82F6 100%);
+    color: #FFFFFF;
+    padding: 1.8rem 2rem;
+    border-radius: 14px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.main-banner h1 {
+    color: #FFFFFF !important;
+    font-size: 2.1rem !important;
+    font-weight: 700 !important;
+    margin-bottom: 0.4rem;
+    letter-spacing: -0.02em;
+}
+
+.main-banner p {
+    color: #DBEAFE !important;
+    font-size: 1rem !important;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Metric Cards - Sleek Dark Elevated */
+div[data-testid="stMetric"] {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+div[data-testid="stMetric"]:hover {
+    border-color: #3B82F6;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2);
+}
+
+div[data-testid="stMetricLabel"] {
+    color: #94A3B8 !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+
+div[data-testid="stMetricValue"] {
+    color: #F8FAFC !important;
+    font-size: 1.55rem !important;
+    font-weight: 700 !important;
+}
+
+/* Custom Insight Callout Cards */
+.insight-card {
+    background: #1E293B;
+    border-left: 4px solid #3B82F6;
+    border-radius: 8px;
+    padding: 1.2rem 1.4rem;
+    margin-top: 1.2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-top: 1px solid #334155;
+    border-right: 1px solid #334155;
+    border-bottom: 1px solid #334155;
+}
+
+.insight-card-title {
+    font-weight: 700;
+    color: #60A5FA;
+    font-size: 1.02rem;
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.insight-card-body {
+    color: #CBD5E1;
+    font-size: 0.92rem;
+    line-height: 1.6;
+}
+
+.insight-card-body ul {
+    margin: 0;
+    padding-left: 1.2rem;
+}
+
+.insight-card-body li {
+    margin-bottom: 0.4rem;
+}
+
+/* Strategic Playbook Cards */
+.playbook-card {
+    background: #1E293B;
+    border-radius: 12px;
+    padding: 1.3rem;
+    height: 100%;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid #334155;
+}
+
+.playbook-card.commercial { border-top: 4px solid #3B82F6; }
+.playbook-card.merchandising { border-top: 4px solid #10B981; }
+.playbook-card.logistics { border-top: 4px solid #EF4444; }
+
+.playbook-title {
+    font-size: 1.02rem;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 0.8rem;
+}
+
+.playbook-title.commercial { color: #60A5FA; }
+.playbook-title.merchandising { color: #34D399; }
+.playbook-title.logistics { color: #F87171; }
+
+.playbook-list {
+    color: #94A3B8;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    padding-left: 1.2rem;
+    margin: 0;
+}
+
+/* Author Credit Box */
+.credit-container {
+    background: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 1.4rem 1.8rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.credit-author {
+    color: #F8FAFC;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.credit-role {
+    color: #94A3B8;
+    font-size: 0.88rem;
+    margin-top: 0.2rem;
+}
+
+.credit-contact {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.credit-email {
+    color: #60A5FA;
+    font-family: monospace;
+    font-size: 0.95rem;
+    text-decoration: none;
+    background: rgba(59, 130, 246, 0.1);
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
