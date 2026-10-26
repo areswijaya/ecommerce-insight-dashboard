@@ -526,7 +526,7 @@ st.markdown(f"""
     <div class="insight-card-body">
         <ul>
             <li><b>Konsentrasi Omset:</b> Dari {total_cats_count} kategori produk aktif pada filter saat ini, <b>{core_cats_count} kategori inti ({core_pct_str})</b> mendominasi 80% omset bisnis, dengan kontribusi terbesar berasal dari {top_3_names}.</li>
-            <li><b>Diferensiasi Nilai Keranjang:</b> Terdapat variasi AOV yang signifikan antarkategori. Beberapa kategori bertindak sebagai pendorong omset bernilai tinggi (*high-ticket niche*), sementara kategori lainnya berfungsi sebagai penarik volume pesanan massal.</li>
+            <li><b>Diferensiasi Nilai Keranjang:</b> Terdapat variasi AOV yang signifikan antarkategori. Beberapa kategori bertindak sebagai pendorong omset bernilai tinggi (<i>high-ticket niche</i>), sementara kategori lainnya berfungsi sebagai penarik volume pesanan massal.</li>
             <li><b>Rekomendasi Aksi:</b> Prioritaskan alokasi inventaris dan ruang etalase utama pada kategori inti, serta kembangkan strategi <i>bundling</i> antara produk bervolume tinggi dengan produk bernilai belanja tinggi.</li>
         </ul>
     </div>
@@ -698,7 +698,7 @@ with col_a2:
         <ul class="playbook-list">
             <li><b>Fokus Alokasi Sumber Daya:</b> Prioritaskan anggaran pemasaran dan ruang etalase pada kategori inti kontributor 80% omset bisnis.</li>
             <li><b>Bundling Produk:</b> Kembangkan paket bundling antara kategori bervolume tinggi dengan produk bernilai tinggi untuk mendorong rata-rata nilai transaksi.</li>
-            <li><b>Rasionalisasi Katalog:</b> Tinjau efisiensi inventaris pada kategori ekor panjang (*long-tail*) dengan kontribusi omset marjinal.</li>
+            <li><b>Rasionalisasi Katalog:</b> Tinjau efisiensi inventaris pada kategori ekor panjang (<i>long-tail</i>) dengan kontribusi omset marjinal.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
