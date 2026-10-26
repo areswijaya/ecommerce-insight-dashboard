@@ -1,5 +1,5 @@
 # 🛍️ E-Commerce Insight Dashboard: Olist Marketplace Analysis
-[![Live Demo](https://img.shields.io/badge/Streamlit%20App-Live%20Demo-FF4B4B.svg)](https://ecommerce-insights-dashboard-areswidjaja.streamlit.app/)
+[![Live Demo](https://img.shields.io/badge/Streamlit%20App-Live%20Demo-FF4B4B.svg)](https://ecommerce-insight-areswijaya.streamlit.app/)
 [![Python Version](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.38%2B-FF4B4B.svg)](https://streamlit.io/)
 [![Plotly](https://img.shields.io/badge/Plotly-Express-3F4F75.svg)](https://plotly.com/)
@@ -8,7 +8,7 @@
 Proyek analisis data komprehensif dan dashboard interaktif berbasis data publik transaksi e-commerce Brasil (**Olist Marketplace**) yang mencakup lebih dari 100.000 transaksi. Portofolio ini dirancang khusus untuk peran **Junior / Entry-Level Data Analyst & BI Analyst**, menonjolkan kekuatan logika matematika, ketelitian pembersihan data (*data wrangling*), pemahaman statistik terapan, disiplin rekayasa data (*Spec-Driven Development*), pengujian kualitas data otomatis, serta kemampuan *visual storytelling* yang aplikatif bagi pengambil keputusan bisnis.
 
 🔗 **Tautan Aplikasi Aktif (Live Interactive Dashboard):**  
-👉 [https://ecommerce-insights-dashboard-areswidjaja.streamlit.app/](https://ecommerce-insights-dashboard-areswidjaja.streamlit.app/)
+👉 [https://ecommerce-insight-areswijaya.streamlit.app/](https://ecommerce-insight-areswijaya.streamlit.app/)
 
 ---
 
