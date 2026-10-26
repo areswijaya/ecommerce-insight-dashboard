@@ -95,7 +95,7 @@ submission/
 ### 1. Kloning Repositori & Persiapan Lingkungan
 ```bash
 # Kloning repositori
-git clone https://github.com/[username-anda]/ecommerce-insight-dashboard.git
+git clone https://github.com/areswijaya/ecommerce-insight-dashboard.git
 cd ecommerce-insight-dashboard
 
 # Buat dan aktifkan virtual environment (opsional)
@@ -135,7 +135,7 @@ Aplikasi akan otomatis terbuka pada peramban lokal di alamat: `http://localhost:
 1. *Push* seluruh isi repositori ini ke cabang `main` pada repositori GitHub Anda.
 2. Buka [share.streamlit.io](https://share.streamlit.io/) dan masuk menggunakan akun GitHub Anda.
 3. Klik **New app**, lalu tentukan parameter:
-   - **Repository:** `[username-anda]/ecommerce-insight-dashboard`
+   - **Repository:** `areswijaya/ecommerce-insight-dashboard`
    - **Branch:** `main`
    - **Main file path:** `dashboard/dashboard.py`
 4. Klik **Deploy!**. Streamlit Cloud akan membaca `requirements.txt`, `runtime.txt`, dan `.streamlit/config.toml` secara otomatis.
