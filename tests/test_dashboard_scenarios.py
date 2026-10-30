@@ -1,6 +1,6 @@
 """
-Test suite validating the 8 filter scenarios specified in rencana_perbaikan_dashboard.md
-to guarantee zero crashes across all edge cases.
+Comprehensive test suite validating multi-scenario edge cases and filter combinations
+to guarantee dashboard stability, zero runtime crashes, and analytical consistency.
 """
 import pytest
 import pandas as pd
