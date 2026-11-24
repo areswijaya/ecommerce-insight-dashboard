@@ -1,13 +1,13 @@
-# Web Dashboard Runtime (Streamlit Cloud)
+# Dashboard runtime
 streamlit>=1.38.0
 pandas>=2.0.0
 numpy>=1.26.0
 plotly>=5.18.0
 scipy>=1.11.0
 
-# Exploratory Data Analysis & Notebook
+# Notebook analysis
 matplotlib>=3.8.0
 seaborn>=0.13.0
 
-# Automated Testing & Quality Assurance
+# Tests
 pytest>=8.0.0

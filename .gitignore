@@ -1,18 +1,18 @@
-# Python Cache
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
 
-# Virtual Environments
+# Virtual environments
 venv/
 .venv/
 env/
 
-# Streamlit Secrets (Never commit secrets; keep config.toml for dark theme)
+# Local Streamlit secrets
 .streamlit/secrets.toml
 
-# OS & Editor Artifacts
+# OS and editor files
 .DS_Store
 Thumbs.db
 .vscode/

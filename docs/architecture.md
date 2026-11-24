@@ -1,59 +1,62 @@
-# 🏗️ System Architecture & Technical Design
+# Arsitektur Sistem & Desain Teknis
 
-Dokumentasi arsitektur sistem, alur pemrosesan data (*data pipeline*), dan pertimbangan desain teknis (*Architecture Decision Records*) pada proyek E-Commerce Insight Dashboard.
+Dokumentasi alur pemrosesan data dan keputusan arsitektur (*Architecture Decision Records*) pada proyek E-Commerce Insight Dashboard.
 
 ---
 
-## 1. Arsitektur Alur Kerja (*Workflow Architecture*)
+## 1. Alur Kerja Sistem
 
-Sistem dibangun dengan arsitektur dua tahap (*two-tier pipeline*) yang memisahkan secara modular antara penyiapan data analitis dengan penyajian antarmuka interaktif:
+Proyek menggunakan arsitektur dua tahap yang memisahkan persiapan data analitis dari penyajian dashboard interaktif:
 
 ```mermaid
 flowchart LR
-    subgraph Tier1 ["Tahap 1: Data Wrangling & Analisis (notebook.ipynb)"]
-        Raw["Raw Data (data/raw/*.csv)<br/>5 Tabel Relasional Olist"] --> Wrangling["Data Wrangling & Cleaning<br/>- Filter 20 Bulan Stabil<br/>- Normalisasi Kalender SLA<br/>- Imputasi Kategori Produk"]
-        Wrangling --> Export["Ekspor Dataset Terpadu<br/>data/clean_orders.csv (16 Kolom)"]
+    subgraph Tier1 ["Tahap 1: Data Wrangling (notebook.ipynb)"]
+        Raw["Data Mentah (data/raw/*.csv)<br/>5 Tabel Relasional Olist"] --> Wrangling["Pembersihan & Rekayasa Fitur<br/>- Filter 20 Bulan (Jan 2017 - Agu 2018)<br/>- Normalisasi Kalender SLA<br/>- Translasi & Imputasi Kategori"]
+        Wrangling --> Export["Dataset Terpadu<br/>data/clean_orders.csv (16 Kolom)"]
     end
 
-    subgraph Tier2 ["Tahap 2: Antarmuka Interaktif (dashboard/dashboard.py)"]
-        Export --> LoadCache["Load Data + @st.cache_data"]
-        LoadCache --> SidebarFilters["Smart Global Filters<br/>- Preset & Custom Date Range<br/>- Mode Seluruh Kategori vs Spesifik"]
-        SidebarFilters --> Granularity["Pemisahan Granularitas Data<br/>- Item-level: Revenue, AOV, Pareto<br/>- Order-level: Durasi, Rating, Gap"]
-        Granularity --> KPIRibbon["Executive KPI Ribbon (5 Metrik)<br/>(Revenue, Orders, AOV, Delivery, Rating)"]
-        KPIRibbon --> Visualizations["3 Visualisasi Inti (Plotly Transparan)<br/>1. Tren Penjualan & MoM Dual-Axis<br/>2. Pareto 80/20 Kategori & AOV<br/>3. Rating Gap On-Time vs Delayed"]
-        Visualizations --> Playbook["Strategic Action Playbook"]
+    subgraph Tier2 ["Tahap 2: Dashboard Interaktif (dashboard/dashboard.py)"]
+        Export --> LoadCache["Load CSV + @st.cache_data"]
+        LoadCache --> SidebarFilters["Filter Global Sidebar<br/>- Preset & Custom Date Range<br/>- Semua vs Pilihan Kategori"]
+        SidebarFilters --> Granularity["Pemisahan Granularitas<br/>- Item-level: Revenue, AOV, Pareto<br/>- Order-level: Durasi, Rating, Gap"]
+        Granularity --> KPIRibbon["5 KPI Utama & Strip Median"]
+        KPIRibbon --> Visualizations["3 Bagian Analitis (Plotly)<br/>1. Tren Pendapatan & MoM<br/>2. Pareto 80/20 & AOV Kategori<br/>3. Rating Gap On-Time vs Delayed"]
+        Visualizations --> Playbook["Rekomendasi Bisnis & Ekspor CSV"]
     end
 
-    subgraph QualityAssurance ["Tahap 3: Pengujian Kualitas Otomatis (pytest)"]
-        Export -.-> QA["16 Pengujian Unit Otomatis<br/>- Integritas data & formula matematika<br/>- Ketahanan 8 skenario filter antarmuka"]
+    subgraph QualityAssurance ["Tahap 3: Pengujian Otomatis (pytest)"]
+        Export -.-> QA["16 Unit & Scenario Tests<br/>- Integritas skema & formula<br/>- 8 skenario filter antarmuka"]
     end
 ```
 
 ---
 
-## 2. Catatan Keputusan Arsitektur (*Architecture Decision Records*)
+## 2. Architecture Decision Records
 
-### ADR-01: Pemisahan Pipeline Dua Tahap (*Two-Tier Pipeline*)
-* **Konteks:** Menjalankan pembersihan dan penggabungan 5 tabel relasional mentah secara langsung di dalam aplikasi dashboard akan membebani memori dan memperlambat waktu respons pengguna.
-* **Keputusan:** Seluruh proses *data wrangling*, audit nilai hilang, rekayasa fitur, dan validasi statistik dijalankan di `notebook.ipynb`. Hasilnya diekspor ke satu file dataset bersih terpadu: `data/clean_orders.csv`. Dashboard Streamlit hanya bertugas membaca file bersih tersebut menggunakan `@st.cache_data`.
-* **Dampak Positif:** Waktu pemuatan awal dashboard berada di bawah 2 detik, memori server efisien, dan proses pembersihan data terdokumentasi secara transparan serta mudah diaudit.
+### ADR-01: Pemisahan Pipeline Dua Tahap
+- **Konteks:** Menggabungkan dan membersihkan lima tabel relasional mentah langsung di dalam aplikasi web membebani memori serta memperlambat rendering awal.
+- **Keputusan:** Proses pembersihan data, deduplikasi ulasan, dan rekayasa fitur dijalankan di `notebook.ipynb`, lalu diekspor ke `data/clean_orders.csv`. Aplikasi Streamlit membaca dataset bersih tersebut dengan `@st.cache_data`.
+- **Dampak:** Aplikasi hanya membaca satu file CSV terstruktur dengan cache aktif, sementara seluruh langkah transformasi data terdokumentasi di notebook untuk audit ulang.
 
-### ADR-02: Format Penyimpanan Dataset Bersih Menggunakan CSV Standar
-* **Konteks:** Menjaga portabilitas proyek tanpa memerlukan ketergantungan library pembaca format biner khusus.
-* **Keputusan:** Menggunakan format CSV standar (`data/clean_orders.csv`).
-* **Dampak Positif:** Universal, dapat dibuka di berbagai *environment* (Jupyter, VS Code, spreadsheet), dan kompatibel langsung dengan Streamlit Cloud deployment.
+### ADR-02: Penyimpanan Dataset Bersih dalam Format CSV
+- **Konteks:** Proyek perlu tetap portabel lintas lingkungan tanpa ketergantungan pembaca biner khusus.
+- **Keputusan:** Menggunakan CSV standar (`data/clean_orders.csv`).
+- **Dampak:** Dapat dibuka langsung di Jupyter, editor teks, maupun spreadsheet, serta kompatibel tanpa konfigurasi tambahan di Streamlit Cloud.
 
-### ADR-03: Visualisasi Interaktif Menggunakan Plotly Express & Subplots Transparan
-* **Konteks:** Visualisasi statis (Matplotlib/Seaborn) kurang fleksibel untuk eksplorasi dinamis, sedangkan kanvas putih keras menyebabkan benturan kontras saat pengguna membuka dashboard dalam mode gelap (*Dark Mode*).
-* **Keputusan:** Menggunakan **Plotly Express** dan `plotly.graph_objects.make_subplots` untuk grafik berskala ganda. Seluruh figur dikonfigurasi dengan latar belakang transparan (`rgba(0,0,0,0)`), margin sumbu Y dinamis, serta tipografi Inter terpadu.
-* **Dampak Positif:** Visualisasi modern, responsif terhadap perubahan ukuran layar, dan beradaptasi mulus dengan tema gelap maupun terang.
+### ADR-03: Antarmuka Dark Slate & Visualisasi Plotly Transparan
+- **Konteks:** Grafik statis kurang mendukung eksplorasi filter, sedangkan warna latar grafik yang kaku bentrok dengan tema gelap aplikasi.
+- **Keputusan:** Menggunakan Plotly Express dan `make_subplots` dengan latar transparan (`rgba(0,0,0,0)`), di atas sistem visual dark slate (`ENERGY 1 / RHYTHM 2 / MOTION 1`):
+  - **Palet:** `#0F172A` sebagai kanvas dan `#1E293B` untuk kartu agar seri data berlatar gelap terbaca kontras, dengan `#38BDF8` sebagai aksen utama grafik/fokus serta `#10B981`/`#EF4444` khusus untuk status tepat waktu vs terlambat.
+  - **Tipografi:** Font `Inter` untuk keterbacaan angka tabular dan label sumbu pada layar padat data.
+  - **Layout & Komposisi:** Pita KPI di atas diikuti tiga bagian analitis (tren waktu, Pareto 80/20, dampak pengiriman) agar pembacaan bergerak dari ringkasan eksekutif ke akar masalah.
+- **Dampak:** Seluruh pasangan teks dan kartu memenuhi kontras WCAG AA, warna semantik tidak tercampur hiasan dekoratif, dan visualisasi merespons filter tanpa tabrakan tema.
 
-### ADR-04: Normalisasi Tanggal Kalender untuk Pengukuran Keterlambatan SLA
-* **Konteks:** Pada dataset Olist, tanggal estimasi tersimpan pada pukul `00:00:00`. Pengurangan langsung antar-*timestamp* menyebabkan pesanan yang tiba siang/sore hari pada tanggal estimasi keliru diklasifikasikan sebagai pesanan terlambat.
-* **Keputusan:** Normalisasikan kedua *timestamp* ke tanggal kalender murni (`.dt.floor('D')`) sebelum menghitung selisih hari keterlambatan (`delay_days`).
-* **Dampak Positif:** Menghilangkan bias klasifikasi pada 1.292 pesanan yang sebenarnya tiba tepat waktu, menghasilkan perhitungan *Satisfaction Gap* dan proporsi ulasan buruk yang akurat secara objektif.
+### ADR-04: Normalisasi Tanggal Kalender untuk SLA Pengiriman
+- **Konteks:** Kolom `order_estimated_delivery_date` pada dataset Olist tersimpan pada pukul `00:00:00`. Perbandingan langsung antar-timestamp membuat pesanan yang tiba siang hari pada tanggal estimasi tercatat terlambat.
+- **Keputusan:** Melakukan normalisasi kedua timestamp ke tanggal kalender (`.dt.floor('D')`) sebelum menghitung `delay_days`.
+- **Dampak:** Mengoreksi status 1.291 pesanan yang sebenarnya tiba pada tanggal estimasi, sehingga perhitungan *Satisfaction Gap* dan persentase ulasan 1 bintang tetap akurat.
 
-### ADR-05: Pemisahan Granularitas Item-Level dan Order-Level di Dashboard
-* **Konteks:** Satu pesanan unik dapat berisi beberapa barang (*multi-item orders*). Menghitung skor ulasan atau durasi pengiriman langsung dari baris item akan memberikan bobot ganda (*duplicate weighting*) pada pesanan dengan banyak barang, mendistorsi analisis kepuasan pelanggan.
-* **Keputusan:** Menghitung omset dan kontribusi produk pada level item transaksi, sedangkan durasi logistik, ketepatan waktu, dan skor ulasan dievaluasi strictly pada level pesanan unik (`df_filtered.drop_duplicates(subset=['order_id'])`).
-* **Dampak Positif:** Menghindari bias statistik dan menjamin keakuratan koefisien korelasi riil antara logistik dan kepuasan pelanggan.
+### ADR-05: Pemisahan Granularitas Item-Level dan Order-Level
+- **Konteks:** Satu pesanan dapat memuat beberapa item produk. Menghitung durasi pengiriman atau skor ulasan langsung dari baris item memberi bobot ganda pada pesanan multi-item.
+- **Keputusan:** Menghitung pendapatan dan kontribusi kategori pada level item, sementara durasi kirim, ketepatan waktu, dan rating dievaluasi pada level `order_id` unik (`drop_duplicates(subset=['order_id'])`).
+- **Dampak:** Mencegah distorsi statistik korelasi dan menjaga akurasi metrik kepuasan pelanggan.
