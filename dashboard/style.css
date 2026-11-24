@@ -16,14 +16,34 @@ button:disabled, [aria-disabled="true"] {
     cursor: not-allowed;
 }
 
+[data-testid="stExpander"] summary {
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+button[aria-label*="sidebar" i],
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stExpandSidebarButton"] button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+}
+
 a[href]:focus-visible,
 button:focus-visible,
 [role="button"]:focus-visible,
 [role="tab"]:focus-visible,
 summary:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
     outline: 2px solid #38BDF8 !important;
     outline-offset: 2px !important;
+}
+
+[data-testid="stMetricValue"],
+[data-testid="stDataFrame"],
+.metadata-strip {
+    font-variant-numeric: tabular-nums;
 }
 
 .main-banner {
@@ -46,9 +66,21 @@ input:focus-visible {
 
 .main-banner p {
     color: #CBD5E1 !important;
-    font-size: 1rem !important;
+    font-size: 0.96rem !important;
     margin: 0;
     line-height: 1.5;
+}
+
+.header-filter-note {
+    margin-top: 0.65rem;
+    display: inline-block;
+    background-color: #0F172A;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #E2E8F0;
 }
 
 div[data-testid="stMetric"] {
@@ -183,57 +215,68 @@ div[data-testid="stMetricValue"] {
     margin-bottom: 0.45rem;
 }
 
-.credit-container {
-    background: #1E293B;
+.filter-status-box {
+    background-color: #1E293B;
     border: 1px solid #334155;
-    border-radius: 10px;
-    padding: 1.25rem 1.5rem;
-    margin-top: 1.5rem;
-    margin-bottom: 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.credit-author {
-    color: #F8FAFC;
-    font-size: 1rem;
-    font-weight: 600;
-}
-
-.credit-role {
-    color: #94A3B8;
-    font-size: 0.88rem;
-    margin-top: 0.2rem;
-}
-
-.credit-contact {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-    color: #94A3B8;
-    font-size: 0.9rem;
-}
-
-.credit-email {
-    color: #38BDF8;
-    font-size: 0.92rem;
-    text-decoration: none;
-    background: rgba(56, 189, 248, 0.1);
-    padding: 0.35rem 0.75rem;
+    color: #CBD5E1;
+    padding: 10px 12px;
     border-radius: 6px;
-    border: 1px solid rgba(56, 189, 248, 0.25);
+    font-size: 0.875rem;
+    margin-top: 8px;
+}
+
+.filter-status-box b {
+    color: #F8FAFC;
+}
+
+.author-card {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-top: 14px;
+}
+
+.author-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #94A3B8;
+    margin-bottom: 4px;
+}
+
+.author-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #F8FAFC;
+    line-height: 1.3;
+    margin-bottom: 10px;
+}
+
+.author-links {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.author-links a {
+    background-color: #0F172A;
+    color: #38BDF8 !important;
+    border: 1px solid #475569;
+    border-radius: 6px;
     min-height: 44px;
+    padding: 0 12px;
     display: inline-flex;
     align-items: center;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
-.credit-email:hover {
-    background: rgba(56, 189, 248, 0.18);
-    color: #F8FAFC;
+.author-links a:hover {
+    background-color: #0369A1;
+    border-color: #38BDF8;
+    color: #FFFFFF !important;
 }
 
 button[data-baseweb="tab"] {
@@ -255,7 +298,8 @@ button[data-baseweb="tab"]:hover {
     color: #F8FAFC !important;
 }
 
-div.stDownloadButton > button {
+div.stDownloadButton > button,
+[data-testid="stSidebar"] .stButton > button {
     min-height: 44px !important;
     background-color: #1E293B !important;
     color: #38BDF8 !important;
@@ -266,7 +310,8 @@ div.stDownloadButton > button {
     transition: background-color 0.15s ease, color 0.15s ease !important;
 }
 
-div.stDownloadButton > button:hover {
+div.stDownloadButton > button:hover,
+[data-testid="stSidebar"] .stButton > button:hover {
     background-color: #0369A1 !important;
     color: #FFFFFF !important;
     border-color: #38BDF8 !important;
@@ -289,8 +334,7 @@ div[data-testid="stExpander"] {
         font-size: 1.5rem !important;
     }
 
-    .metadata-strip,
-    .credit-container {
+    .metadata-strip {
         flex-direction: column;
         align-items: flex-start;
         gap: 0.5rem;

@@ -1,18 +1,12 @@
-# Python cache
+.venv/
+venv/
+env/
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
-
-# Virtual environments
-venv/
-.venv/
-env/
-
-# Local Streamlit secrets
+.ipynb_checkpoints/
 .streamlit/secrets.toml
-
-# OS and editor files
 .DS_Store
 Thumbs.db
 .vscode/

@@ -1,6 +1,6 @@
 {
-  "name": "Python 3",
-  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+  "name": "E-Commerce Insight Dashboard",
+  "image": "mcr.microsoft.com/devcontainers/python:3",
   "customizations": {
     "codespaces": {
       "openFiles": [
@@ -16,7 +16,7 @@
       ]
     }
   },
-  "updateContentCommand": "[ -f packages.txt ] && sudo apt update && sudo apt upgrade -y && sudo xargs apt install -y <packages.txt; [ -f requirements.txt ] && pip3 install --user -r requirements.txt; pip3 install --user streamlit; echo 'Packages installed'",
+  "updateContentCommand": "pip3 install --user -r requirements.txt",
   "postAttachCommand": {
     "server": "streamlit run dashboard/dashboard.py --server.enableCORS false --server.enableXsrfProtection false"
   },

@@ -1,24 +1,33 @@
-import os
-import streamlit as st
+from pathlib import Path
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import streamlit as st
+
+BASE_DIR = Path(__file__).resolve().parent
+TOP_CATEGORIES_DEFAULT = [
+    "health_beauty",
+    "watches_gifts",
+    "bed_bath_table",
+    "sports_leisure",
+    "computers_accessories",
+]
 
 st.set_page_config(
-    page_title="E-Commerce Analytics Dashboard | Olist",
+    page_title="E-Commerce Insight Dashboard | Olist",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-css_path = os.path.join(os.path.dirname(__file__), "style.css")
-if os.path.exists(css_path):
-    with open(css_path, "r", encoding="utf-8") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+css_path = BASE_DIR / "style.css"
+if css_path.exists():
+    st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 
 
 def fmt_number(val, is_currency: bool = False, decimals: int = 0) -> str:
-    """Format numeric values with comma thousands separators and optional BRL prefix."""
+    """Format angka dengan pemisah ribuan koma dan awalan R$ opsional."""
     if val is None or pd.isna(val):
         return "-"
     try:
@@ -31,7 +40,7 @@ def fmt_number(val, is_currency: bool = False, decimals: int = 0) -> str:
 
 
 def apply_plot_theme(fig, title="", x_title="", y_title="", margin=None):
-    """Apply transparent dark-theme layout and typography to a Plotly figure."""
+    """Terapkan tata letak gelap transparan dan tipografi seragam pada grafik Plotly."""
     if margin is None:
         margin = dict(l=75, r=40, t=55, b=45)
     fig.update_layout(
@@ -49,14 +58,13 @@ def apply_plot_theme(fig, title="", x_title="", y_title="", margin=None):
 
 @st.cache_data(show_spinner=False)
 def load_data():
-    """Load clean_orders.csv from standard repository working directories."""
-    possible_paths = [
-        os.path.join("data", "clean_orders.csv"),
-        os.path.join("..", "data", "clean_orders.csv"),
-        os.path.join(os.path.dirname(__file__), "..", "data", "clean_orders.csv"),
-        "clean_orders.csv",
+    """Muat clean_orders.csv dari lokasi standar proyek."""
+    candidates = [
+        BASE_DIR.parent / "data" / "clean_orders.csv",
+        Path("data") / "clean_orders.csv",
+        Path("clean_orders.csv"),
     ]
-    file_path = next((p for p in possible_paths if os.path.exists(p)), None)
+    file_path = next((p for p in candidates if p.exists()), None)
     if not file_path:
         return None
 
@@ -69,53 +77,66 @@ def load_data():
     return df
 
 
-with st.spinner("Loading analytical dataset..."):
+def reset_filters():
+    """Kembalikan seluruh filter sidebar ke pilihan awal."""
+    prev = st.session_state.get("filter_reset_gen", 0)
+    for prefix in ("filter_period_", "filter_dates_", "filter_all_cats_", "filter_cats_"):
+        st.session_state.pop(f"{prefix}{prev}", None)
+    st.session_state["filter_reset_gen"] = prev + 1
+
+
+with st.spinner("Memuat dataset transaksi..."):
     df_raw = load_data()
 
 if df_raw is None:
-    st.error("Dataset file `clean_orders.csv` was not found. Ensure it exists in the `data/` folder.")
+    st.error("File `data/clean_orders.csv` tidak ditemukan. Pastikan dataset bersih sudah dibuat oleh `notebook.ipynb`.")
     st.stop()
-
-st.sidebar.title("Dashboard Filters")
 
 min_date = df_raw["order_purchase_date"].min()
 max_date = df_raw["order_purchase_date"].max()
+all_categories = sorted(df_raw["product_category_name_english"].dropna().unique().tolist())
+total_orders_all = df_raw["order_id"].nunique()
 
-st.sidebar.subheader("Date Range")
+gen = st.session_state.get("filter_reset_gen", 0)
+st.sidebar.header("Filter Data")
+st.sidebar.caption("Berlaku pada seluruh metrik dan grafik di dashboard.")
+
 period_preset = st.sidebar.selectbox(
-    "Analysis Period",
+    "Periode Analisis",
     options=[
-        "All Time (Jan 2017 - Aug 2018)",
-        "Year 2017 (Expansion & Black Friday Peak)",
-        "Year 2018 (Market Maturity)",
-        "Custom Date Range",
+        "Semua Periode (Jan 2017 - Agu 2018)",
+        "Tahun 2017 (Ekspansi & Puncak Black Friday)",
+        "Tahun 2018 (Fase Stabil)",
+        "Pilih Rentang Tanggal",
     ],
     index=0,
-    help="Select a preset period or switch to Custom Date Range.",
+    key=f"filter_period_{gen}",
+    help="Pilih periode cepat atau tentukan tanggal awal dan akhir sendiri.",
 )
 
-if period_preset == "Year 2017 (Expansion & Black Friday Peak)":
+if period_preset == "Tahun 2017 (Ekspansi & Puncak Black Friday)":
     start_date = pd.to_datetime("2017-01-01").date()
     end_date = pd.to_datetime("2017-12-31").date()
-    st.sidebar.caption(f"Selected: **{start_date.strftime('%b %d, %Y')}** to **{end_date.strftime('%b %d, %Y')}**")
-elif period_preset == "Year 2018 (Market Maturity)":
+    st.sidebar.caption(f"Periode: **{start_date.strftime('%d %b %Y')}** - **{end_date.strftime('%d %b %Y')}**")
+elif period_preset == "Tahun 2018 (Fase Stabil)":
     start_date = pd.to_datetime("2018-01-01").date()
     end_date = pd.to_datetime("2018-08-31").date()
-    st.sidebar.caption(f"Selected: **{start_date.strftime('%b %d, %Y')}** to **{end_date.strftime('%b %d, %Y')}**")
-elif period_preset == "Custom Date Range":
+    st.sidebar.caption(f"Periode: **{start_date.strftime('%d %b %Y')}** - **{end_date.strftime('%d %b %Y')}**")
+elif period_preset == "Pilih Rentang Tanggal":
     date_selection = st.sidebar.date_input(
-        "Custom Date Range",
+        "Rentang Tanggal",
         value=(min_date, max_date),
         min_value=min_date,
         max_value=max_date,
-        help="Dataset covers Jan 1, 2017 to Aug 31, 2018.",
+        key=f"filter_dates_{gen}",
+        help="Cakupan data: 1 Jan 2017 - 31 Agu 2018.",
     )
     if isinstance(date_selection, (tuple, list)):
         if len(date_selection) == 2:
             start_date, end_date = date_selection
         elif len(date_selection) == 1:
             start_date = end_date = date_selection[0]
-            st.sidebar.info("Single date selected. Showing orders for this day.")
+            st.sidebar.info("Satu tanggal dipilih. Menampilkan transaksi pada hari tersebut.")
         else:
             start_date, end_date = min_date, max_date
     else:
@@ -124,58 +145,80 @@ else:
     start_date = min_date
     end_date = max_date
     st.sidebar.caption(
-        f"Selected: **{start_date.strftime('%b %d, %Y')}** to **{end_date.strftime('%b %d, %Y')}** (20 Months)"
+        f"Periode: **{start_date.strftime('%d %b %Y')}** - **{end_date.strftime('%d %b %Y')}** (20 Bulan)"
     )
 
-all_categories = sorted(df_raw["product_category_name_english"].dropna().unique().tolist())
-
-st.sidebar.subheader("Product Categories")
-all_categories_mode = st.sidebar.checkbox(f"All Categories ({len(all_categories)} Active)", value=True)
+all_categories_mode = st.sidebar.checkbox(
+    f"Semua Kategori ({len(all_categories)} Aktif)",
+    value=True,
+    key=f"filter_all_cats_{gen}",
+)
 if all_categories_mode:
     selected_categories = all_categories
-    st.sidebar.caption(f"Showing all {len(all_categories)} active categories.")
 else:
-    top_default = ["health_beauty", "watches_gifts", "bed_bath_table", "sports_leisure", "computers_accessories"]
     selected_categories = st.sidebar.multiselect(
-        "Select Categories",
+        "Pilih Kategori Produk",
         options=all_categories,
-        default=top_default,
-        help="Pick one or more product categories to compare.",
+        default=TOP_CATEGORIES_DEFAULT,
+        key=f"filter_cats_{gen}",
+        help="Pilih satu atau beberapa kategori untuk dibandingkan.",
     )
 
-st.sidebar.markdown("---")
-
-st.sidebar.subheader("Author")
-st.sidebar.markdown(
-    "**Ilfa Antaries Yusuf Wijaya**  \n"
-    "[contact.areswijaya@gmail.com](mailto:contact.areswijaya@gmail.com)"
-)
-
-st.sidebar.subheader("Dataset")
-st.sidebar.markdown(
-    "**Source:** [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) (Kaggle)  \n"
-    "**Scope:** Delivered orders from Jan 2017 to Aug 2018 (109,872 line items across 96,203 orders)."
+st.sidebar.button(
+    "Reset Filter",
+    on_click=reset_filters,
+    key="reset_filters_btn",
+    width="stretch",
 )
 
 mask_date = (df_raw["order_purchase_date"] >= start_date) & (df_raw["order_purchase_date"] <= end_date)
 mask_cat = df_raw["product_category_name_english"].isin(selected_categories)
 df_filtered = df_raw[mask_date & mask_cat].copy()
 
-# Deduplicate to order level so multi-item orders do not skew delivery or review metrics.
+# Deduplikasi ke tingkat order_id agar pesanan multi-item tidak membobot ganda durasi kirim atau rating.
 df_orders = df_filtered.drop_duplicates(subset=["order_id"]).copy()
 
-st.markdown(
+st.sidebar.markdown(
+    f'<div class="filter-status-box">Menampilkan <b>{len(df_orders):,}</b> '
+    f'dari <b>{total_orders_all:,}</b> pesanan terkirim</div>',
+    unsafe_allow_html=True,
+)
+st.sidebar.markdown(
     """
+<div class="author-card">
+<div class="author-label">Dibuat oleh</div>
+<div class="author-name">Ilfa Antaries Yusuf Wijaya</div>
+<div class="author-links">
+<a href="mailto:contact.areswijaya@gmail.com" target="_blank" rel="noopener noreferrer">Email</a>
+<a href="https://www.linkedin.com/in/areswijaya" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+<a href="https://github.com/areswijaya" target="_blank" rel="noopener noreferrer">GitHub</a>
+</div>
+</div>
+    """,
+    unsafe_allow_html=True,
+)
+
+filter_note_html = ""
+if len(df_orders) != total_orders_all:
+    filter_note_html = (
+        f'<div class="header-filter-note">'
+        f'Filter aktif: menampilkan {len(df_orders):,} dari {total_orders_all:,} pesanan terkirim.'
+        f'</div>'
+    )
+
+st.markdown(
+    f"""
 <div class="main-banner">
-    <h1>E-Commerce Performance Dashboard</h1>
-    <p>Sales trends, product category Pareto (80/20), and delivery impact on customer satisfaction across Olist Marketplace.</p>
+    <h1>E-Commerce Insight Dashboard</h1>
+    <p>Tren pendapatan bulanan, konsentrasi kategori Pareto (80/20), dan dampak ketepatan pengiriman terhadap rating pelanggan pada dataset Olist Marketplace (Jan 2017 - Agu 2018).</p>
+    {filter_note_html}
 </div>
 """,
     unsafe_allow_html=True,
 )
 
 if df_filtered.empty or df_orders.empty:
-    st.warning("No orders match the active filters. Adjust the date range or product categories in the sidebar.")
+    st.warning("Tidak ada pesanan yang cocok dengan filter aktif. Klik 'Reset Filter' atau ubah pilihan di sidebar.")
     st.stop()
 
 total_revenue = df_filtered["total_order_value"].sum()
@@ -191,37 +234,37 @@ avg_review_score = df_reviewed["review_score"].mean() if not df_reviewed.empty e
 
 kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
 kpi1.metric(
-    "Total Net Revenue",
+    "Total Pendapatan Bersih",
     fmt_number(total_revenue, is_currency=True),
-    help="Sum of product price and freight across delivered items.",
+    help="Total harga produk ditambah biaya kirim pada pesanan berstatus delivered.",
 )
 kpi2.metric(
-    "Delivered Orders",
+    "Pesanan Terkirim",
     fmt_number(total_orders),
-    help=f"Unique delivered orders ({fmt_number(len(df_filtered))} line items).",
+    help=f"Jumlah order_id unik ({fmt_number(len(df_filtered))} baris item terjual).",
 )
 kpi3.metric(
-    "Average Order Value",
+    "Rata-Rata Nilai Pesanan (AOV)",
     fmt_number(aov, is_currency=True, decimals=2),
-    help="Total net revenue divided by unique delivered orders.",
+    help="Total pendapatan bersih dibagi jumlah pesanan unik.",
 )
 kpi4.metric(
-    "Avg Delivery Time",
-    f"{fmt_number(avg_delivery_days, decimals=1)} Days" if pd.notna(avg_delivery_days) else "-",
-    help=f"Mean purchase-to-delivery duration. Median: {fmt_number(median_delivery_days, decimals=1)} days.",
+    "Rata-Rata Durasi Kirim",
+    f"{fmt_number(avg_delivery_days, decimals=1)} Hari" if pd.notna(avg_delivery_days) else "-",
+    help=f"Rata-rata waktu dari pembelian hingga diterima pelanggan. Median: {fmt_number(median_delivery_days, decimals=1)} hari.",
 )
 kpi5.metric(
-    "Avg Review Score",
+    "Rata-Rata Skor Ulasan",
     f"{fmt_number(avg_review_score, decimals=2)} / 5.0" if avg_review_score is not None else "-",
-    help=f"Mean customer rating on a 1 to 5 scale ({fmt_number(on_time_pct, decimals=1)}% delivered on time).",
+    help=f"Rata-rata rating pelanggan skala 1-5 ({fmt_number(on_time_pct, decimals=1)}% pesanan tepat waktu).",
 )
 
 st.markdown(
     f"""
 <div class="metadata-strip">
-    <span><strong>Median Delivery Time:</strong> {fmt_number(median_delivery_days, decimals=1)} Days</span>
-    <span><strong>On-Time Delivery Rate:</strong> <span class="text-ontime">{fmt_number(on_time_pct, decimals=1)}%</span></span>
-    <span><strong>Total Items Sold:</strong> {fmt_number(len(df_filtered))} Items</span>
+    <span><strong>Median Durasi Kirim:</strong> {fmt_number(median_delivery_days, decimals=1)} Hari</span>
+    <span><strong>Ketepatan Pengiriman:</strong> <span class="text-ontime">{fmt_number(on_time_pct, decimals=1)}%</span></span>
+    <span><strong>Total Item Terjual:</strong> {fmt_number(len(df_filtered))} Item</span>
 </div>
 """,
     unsafe_allow_html=True,
@@ -229,8 +272,8 @@ st.markdown(
 
 st.markdown('<hr class="section-divider"/>', unsafe_allow_html=True)
 
-st.subheader("1. Monthly Revenue and Growth Dynamics")
-st.caption("Monthly net revenue, delivered order count, and month-over-month growth rates.")
+st.subheader("1. Dinamika Pendapatan & Pertumbuhan Bulanan")
+st.caption("Pergerakan pendapatan bersih bulanan, jumlah pesanan terkirim, dan laju pertumbuhan MoM.")
 
 monthly_agg = (
     df_filtered.groupby("order_year_month")
@@ -243,7 +286,7 @@ monthly_agg["aov"] = monthly_agg["revenue"] / monthly_agg["orders"]
 col1, col2 = st.columns([7, 5])
 
 with col1:
-    tab_trend, tab_aov_trend = st.tabs(["Revenue & Order Volume", "Average Order Value (AOV)"])
+    tab_trend, tab_aov_trend = st.tabs(["Pendapatan & Volume Pesanan", "Rata-Rata Nilai Pesanan (AOV)"])
 
     with tab_trend:
         fig_trend = make_subplots(specs=[[{"secondary_y": True}]])
@@ -251,11 +294,11 @@ with col1:
             go.Scatter(
                 x=monthly_agg["order_year_month"],
                 y=monthly_agg["revenue"],
-                name="Net Revenue (BRL)",
+                name="Pendapatan Bersih (BRL)",
                 mode="lines+markers",
                 line=dict(color="#38BDF8", width=3),
                 marker=dict(size=7, color="#38BDF8"),
-                hovertemplate="Month: %{x}<br>Revenue: R$ %{y:,.2f}<extra></extra>",
+                hovertemplate="Bulan: %{x}<br>Pendapatan: R$ %{y:,.2f}<extra></extra>",
             ),
             secondary_y=False,
         )
@@ -263,11 +306,11 @@ with col1:
             go.Scatter(
                 x=monthly_agg["order_year_month"],
                 y=monthly_agg["orders"],
-                name="Delivered Orders",
+                name="Pesanan Terkirim",
                 mode="lines+markers",
                 line=dict(color="#34D399", width=2, dash="dash"),
                 marker=dict(size=6, symbol="square", color="#34D399"),
-                hovertemplate="Month: %{x}<br>Orders: %{y:,}<extra></extra>",
+                hovertemplate="Bulan: %{x}<br>Pesanan: %{y:,}<extra></extra>",
             ),
             secondary_y=True,
         )
@@ -281,7 +324,7 @@ with col1:
             fig_trend.add_annotation(
                 x="2017-11",
                 y=bf_row["revenue"],
-                text=f"<b>Black Friday Peak (Nov 2017)</b><br>{bf_rev_str}{bf_mom_str}",
+                text=f"<b>Puncak Black Friday (Nov 2017)</b><br>{bf_rev_str}{bf_mom_str}",
                 showarrow=True,
                 arrowhead=2,
                 arrowcolor="#EF4444",
@@ -295,12 +338,17 @@ with col1:
                 font=dict(color="#F8FAFC", size=10),
             )
 
-        apply_plot_theme(fig_trend, title="Monthly Net Revenue vs Order Volume", x_title="Order Month", y_title="Net Revenue (BRL)")
+        apply_plot_theme(
+            fig_trend,
+            title="Pendapatan Bersih Bulanan vs Volume Pesanan",
+            x_title="Bulan Pesanan",
+            y_title="Pendapatan Bersih (BRL)",
+        )
         fig_trend.update_layout(
             hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
-        fig_trend.update_yaxes(title_text="Total Orders", secondary_y=True, showgrid=False, automargin=True)
+        fig_trend.update_yaxes(title_text="Jumlah Pesanan", secondary_y=True, showgrid=False, automargin=True)
         st.plotly_chart(fig_trend, width="stretch")
 
     with tab_aov_trend:
@@ -313,7 +361,7 @@ with col1:
                 mode="lines+markers",
                 line=dict(color="#38BDF8", width=2.5),
                 marker=dict(size=6, color="#38BDF8"),
-                hovertemplate="Month: %{x}<br>AOV: R$ %{y:,.2f}<extra></extra>",
+                hovertemplate="Bulan: %{x}<br>AOV: R$ %{y:,.2f}<extra></extra>",
             )
         )
         if not monthly_agg.empty:
@@ -323,13 +371,13 @@ with col1:
                 line_dash="dash",
                 line_color="#94A3B8",
                 line_width=1.5,
-                annotation_text=f"Mean: {fmt_number(mean_aov_val, is_currency=True, decimals=1)}",
+                annotation_text=f"Rata-rata: {fmt_number(mean_aov_val, is_currency=True, decimals=1)}",
                 annotation_position="bottom right",
             )
-        apply_plot_theme(fig_aov_trend, title="Monthly Average Order Value (AOV)", x_title="Order Month", y_title="AOV (BRL)")
+        apply_plot_theme(fig_aov_trend, title="Rata-Rata Nilai Pesanan (AOV) Bulanan", x_title="Bulan Pesanan", y_title="AOV (BRL)")
         fig_aov_trend.update_layout(hovermode="x unified")
         st.plotly_chart(fig_aov_trend, width="stretch")
-        st.caption("Dashed line marks the period mean AOV. Flat AOV indicates revenue growth came from order volume rather than price increases.")
+        st.caption("Garis putus-putus menandai rata-rata AOV periode aktif. AOV yang datar menunjukkan pertumbuhan omset berasal dari jumlah pesanan, bukan kenaikan harga.")
 
 with col2:
     mom_vals = monthly_agg["mom_growth"]
@@ -338,7 +386,7 @@ with col2:
     for idx, val in enumerate(mom_vals):
         if idx == 0 or pd.isna(val):
             colors_mom.append("#64748B")
-            hover_texts.append("Baseline Month")
+            hover_texts.append("Bulan Dasar")
         elif val >= 0:
             colors_mom.append("#34D399")
             hover_texts.append(f"+{fmt_number(val, decimals=2)}%")
@@ -353,36 +401,36 @@ with col2:
             y=mom_vals.fillna(0),
             marker_color=colors_mom,
             customdata=hover_texts,
-            hovertemplate="Month: %{x}<br>MoM Growth: %{customdata}<extra></extra>",
+            hovertemplate="Bulan: %{x}<br>Pertumbuhan MoM: %{customdata}<extra></extra>",
         )
     )
     fig_mom.add_hline(y=0, line_dash="solid", line_color="#94A3B8", line_width=1)
     apply_plot_theme(
         fig_mom,
-        title="Month-over-Month Growth (MoM %)",
-        x_title="Order Month",
-        y_title="MoM Growth (%)",
+        title="Pertumbuhan Bulanan (MoM %)",
+        x_title="Bulan Pesanan",
+        y_title="Pertumbuhan MoM (%)",
         margin=dict(l=65, r=30, t=55, b=45),
     )
     st.plotly_chart(fig_mom, width="stretch")
-    st.caption("First month acts as the baseline. Mid-month filter cutoffs reflect partial volume in the opening month.")
+    st.caption("Bulan pertama menjadi acuan dasar. Jika filter dimulai di tengah bulan, angka bulan awal hanya mencerminkan transaksi parsial.")
 
 peak_row = monthly_agg.loc[monthly_agg["revenue"].idxmax()]
 peak_month = peak_row["order_year_month"]
 peak_rev = fmt_number(peak_row["revenue"], is_currency=True)
 first_month = monthly_agg.iloc[0]["order_year_month"]
 first_rev = fmt_number(monthly_agg.iloc[0]["revenue"], is_currency=True)
-avg_aov_range = f"{fmt_number(monthly_agg['aov'].min(), is_currency=True)} to {fmt_number(monthly_agg['aov'].max(), is_currency=True)}"
+avg_aov_range = f"{fmt_number(monthly_agg['aov'].min(), is_currency=True)} sampai {fmt_number(monthly_agg['aov'].max(), is_currency=True)}"
 
 st.markdown(
     f"""
 <div class="insight-card">
-    <div class="insight-card-title">Key Insights: Sales Growth and Seasonal Patterns</div>
+    <div class="insight-card-title">Ringkasan Pertumbuhan & Pola Musiman</div>
     <div class="insight-card-body">
         <ul>
-            <li>Monthly revenue grew from <b>{first_rev}</b> ({first_month}) to a peak of <b>{peak_rev}</b> in {peak_month}.</li>
-            <li>The November 2017 spike reflects Black Friday demand, followed by post-holiday normalization in December.</li>
-            <li>Average Order Value held between <b>{avg_aov_range}</b> across months, showing that higher order counts drove expansion.</li>
+            <li>Pendapatan bulanan naik dari <b>{first_rev}</b> ({first_month}) hingga puncaknya <b>{peak_rev}</b> pada {peak_month}.</li>
+            <li>Lonjakan November 2017 mencerminkan permintaan Black Friday, lalu kembali melandai pada Desember.</li>
+            <li>AOV bertahan di kisaran <b>{avg_aov_range}</b>, menandakan ekspansi penjualan didorong penambahan volume pesanan.</li>
         </ul>
     </div>
 </div>
@@ -392,8 +440,8 @@ st.markdown(
 
 st.markdown('<hr class="section-divider"/>', unsafe_allow_html=True)
 
-st.subheader("2. Product Category Portfolio: 80/20 Pareto Analysis")
-st.caption("Identifies the core categories contributing 80% of cumulative revenue and compares their AOV.")
+st.subheader("2. Portofolio Kategori Produk: Analisis Pareto 80/20")
+st.caption("Memetakan kategori penyumbang 80% pendapatan kumulatif beserta perbedaan AOV antar-kategori.")
 
 cat_agg = (
     df_filtered.groupby("product_category_name_english")
@@ -415,17 +463,17 @@ core_cats_count = (cat_agg["cum_pct"] <= 80).sum() + 1 if total_cats_count > 0 e
 col_p1, col_p2 = st.columns([7, 5])
 
 with col_p1:
-    # Bypass slider when 5 or fewer categories are active to prevent Streamlit min/max errors.
+    # Lewati slider jika kategori aktif <= 5 agar rentang min/max st.slider tetap valid.
     if total_cats_count <= 1:
         top_n = total_cats_count
-        st.info(f"Showing 1 selected category: **{cat_agg.iloc[0]['product_category_name_english']}**")
+        st.info(f"Menampilkan 1 kategori terpilih: **{cat_agg.iloc[0]['product_category_name_english']}**")
     elif total_cats_count <= 5:
         top_n = total_cats_count
-        st.caption(f"Showing all {total_cats_count} selected categories.")
+        st.caption(f"Menampilkan seluruh {total_cats_count} kategori terpilih.")
     else:
         slider_max = min(30, total_cats_count)
         slider_default = min(15, total_cats_count)
-        top_n = st.slider("Display Top N Categories", min_value=1, max_value=slider_max, value=slider_default)
+        top_n = st.slider("Tampilkan N Kategori Teratas", min_value=1, max_value=slider_max, value=slider_default)
 
     df_pareto_display = cat_agg.head(top_n).copy()
     colors_pareto = ["#3B82F6" if i < core_cats_count else "#64748B" for i in range(len(df_pareto_display))]
@@ -435,9 +483,9 @@ with col_p1:
         go.Bar(
             x=df_pareto_display["product_category_name_english"],
             y=df_pareto_display["total_revenue"],
-            name="Revenue (BRL)",
+            name="Pendapatan (BRL)",
             marker_color=colors_pareto,
-            hovertemplate="Category: %{x}<br>Revenue: R$ %{y:,.2f}<extra></extra>",
+            hovertemplate="Kategori: %{x}<br>Pendapatan: R$ %{y:,.2f}<extra></extra>",
         ),
         secondary_y=False,
     )
@@ -445,11 +493,11 @@ with col_p1:
         go.Scatter(
             x=df_pareto_display["product_category_name_english"],
             y=df_pareto_display["cum_pct"],
-            name="Cumulative (%)",
+            name="Kumulatif (%)",
             mode="lines+markers",
             line=dict(color="#F87171", width=2.5),
             marker=dict(size=6, color="#F87171"),
-            hovertemplate="Category: %{x}<br>Cumulative: %{y:.1f}%<extra></extra>",
+            hovertemplate="Kategori: %{x}<br>Kumulatif: %{y:.1f}%<extra></extra>",
         ),
         secondary_y=True,
     )
@@ -458,17 +506,17 @@ with col_p1:
         line_dash="dash",
         line_color="#F87171",
         secondary_y=True,
-        annotation_text="80% Pareto Cutoff",
+        annotation_text="Batas Pareto 80%",
         annotation_position="bottom right",
     )
 
-    apply_plot_theme(fig_pareto, title=f"Top {top_n} Product Categories by Revenue (Pareto Curve)", y_title="Revenue (BRL)")
+    apply_plot_theme(fig_pareto, title=f"Top {top_n} Kategori Produk berdasarkan Pendapatan (Kurva Pareto)", y_title="Pendapatan (BRL)")
     fig_pareto.update_layout(
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     fig_pareto.update_xaxes(tickangle=-45)
-    fig_pareto.update_yaxes(title_text="Cumulative (%)", secondary_y=True, range=[0, 105], showgrid=False, automargin=True)
+    fig_pareto.update_yaxes(title_text="Kumulatif (%)", secondary_y=True, range=[0, 105], showgrid=False, automargin=True)
     st.plotly_chart(fig_pareto, width="stretch")
 
 with col_p2:
@@ -479,10 +527,10 @@ with col_p2:
     st.markdown(
         f"""
     <div class="summary-card">
-        <h4>Pareto Principle Summary</h4>
+        <h4>Ringkasan Prinsip Pareto</h4>
         <p>
-            <b>{core_cats_count} of {total_cats_count} categories ({core_pct_str})</b> generate <b>80% of total revenue</b> in the current selection.<br/>
-            Top category: <b>{top_cat_name}</b> ({top_cat_rev}).
+            <b>{core_cats_count} dari {total_cats_count} kategori ({core_pct_str})</b> menyumbang <b>80% total pendapatan</b> pada pilihan saat ini.<br/>
+            Kategori teratas: <b>{top_cat_name}</b> ({top_cat_rev}).
         </p>
     </div>
     """,
@@ -494,13 +542,13 @@ with col_p2:
         x="aov",
         y="product_category_name_english",
         orientation="h",
-        labels={"aov": "AOV (BRL)", "product_category_name_english": "Product Category"},
+        labels={"aov": "AOV (BRL)", "product_category_name_english": "Kategori Produk"},
         color="aov",
         color_continuous_scale="Blues",
     )
     apply_plot_theme(
         fig_aov,
-        title=f"Average Order Value by Category (Top {top_n})",
+        title=f"Rata-Rata Nilai Pesanan per Kategori (Top {top_n})",
         x_title="AOV (BRL)",
         margin=dict(l=85, r=30, t=55, b=45),
     )
@@ -516,12 +564,12 @@ top_3_names = (
 st.markdown(
     f"""
 <div class="insight-card">
-    <div class="insight-card-title">Key Insights: Product Portfolio</div>
+    <div class="insight-card-title">Ringkasan Portofolio Produk</div>
     <div class="insight-card-body">
         <ul>
-            <li>Across {total_cats_count} active categories, <b>{core_cats_count} categories ({core_pct_str})</b> generate 80% of revenue, led by {top_3_names}.</li>
-            <li>Order values differ across categories: higher-priced items such as watches and computers lift spend per order, while household staples such as bed, bath, and table drive purchase frequency.</li>
-            <li>Prioritize stock availability and campaign placement for these core categories, and bundle everyday staples with higher-priced items.</li>
+            <li>Dari {total_cats_count} kategori aktif, <b>{core_cats_count} kategori ({core_pct_str})</b> menyumbang 80% pendapatan dengan kontributor utama {top_3_names}.</li>
+            <li>Nilai belanja berbeda antarsegmen: kategori seperti jam tangan dan komputer mendorong nominal per transaksi, sedangkan kebutuhan rumah tangga menopang frekuensi pesanan.</li>
+            <li>Fokuskan ketersediaan stok dan slot promosi pada kategori inti, lalu padukan produk berfrekuensi tinggi dengan barang bernilai lebih tinggi.</li>
         </ul>
     </div>
 </div>
@@ -531,8 +579,8 @@ st.markdown(
 
 st.markdown('<hr class="section-divider"/>', unsafe_allow_html=True)
 
-st.subheader("3. Delivery Performance and Customer Satisfaction")
-st.caption("Evaluates how delivery duration and calendar delays relate to review scores on unique orders.")
+st.subheader("3. Kinerja Pengiriman & Kepuasan Pelanggan")
+st.caption("Mengukur hubungan durasi pengiriman riil dan keterlambatan kalender terhadap skor ulasan pada pesanan unik.")
 
 ontime_df = df_reviewed[~df_reviewed["is_delayed"]]
 late_df = df_reviewed[df_reviewed["is_delayed"]]
@@ -548,9 +596,9 @@ col_d1, col_d2 = st.columns([6, 6])
 
 with col_d1:
     tab_rating, tab_prop, tab_dist = st.tabs([
-        "Average Review Score",
-        "1-Star Review Rate",
-        "Rating Distribution (1 to 5)",
+        "Rata-Rata Skor Ulasan",
+        "Persentase Ulasan Bintang 1",
+        "Distribusi Skor Ulasan (1-5)",
     ])
 
     n_ontime = len(ontime_df)
@@ -558,33 +606,33 @@ with col_d1:
 
     with tab_rating:
         gap_labels = [
-            f"On-Time or Early\n({fmt_number(n_ontime)} orders)",
-            f"Delayed Past Estimate\n({fmt_number(n_late)} orders)",
+            f"Tepat Waktu / Lebih Awal\n({fmt_number(n_ontime)} pesanan)",
+            f"Terlambat dari Estimasi\n({fmt_number(n_late)} pesanan)",
         ]
         gap_values = [on_time_avg if on_time_avg is not None else 0, late_avg if late_avg is not None else 0]
         gap_texts = [
-            f"{fmt_number(on_time_avg, decimals=2)} / 5.0" if on_time_avg is not None else "No Data",
-            f"{fmt_number(late_avg, decimals=2)} / 5.0" if late_avg is not None else "No Data",
+            f"{fmt_number(on_time_avg, decimals=2)} / 5.0" if on_time_avg is not None else "Tidak Ada Data",
+            f"{fmt_number(late_avg, decimals=2)} / 5.0" if late_avg is not None else "Tidak Ada Data",
         ]
 
         gap_data = pd.DataFrame({
-            "Delivery Status": gap_labels,
-            "Average Rating": gap_values,
-            "Text": gap_texts,
+            "Status Pengiriman": gap_labels,
+            "Rata-Rata Rating": gap_values,
+            "Label": gap_texts,
         })
         fig_gap = px.bar(
             gap_data,
-            x="Delivery Status",
-            y="Average Rating",
-            text="Text",
-            color="Delivery Status",
+            x="Status Pengiriman",
+            y="Rata-Rata Rating",
+            text="Label",
+            color="Status Pengiriman",
             color_discrete_sequence=["#10B981", "#EF4444"],
         )
         fig_gap.update_traces(textposition="outside", width=0.45)
         apply_plot_theme(
             fig_gap,
-            title="Customer Ratings: On-Time vs Delayed Deliveries",
-            y_title="Average Rating (1-5 Stars)",
+            title="Rata-Rata Rating: Tepat Waktu vs Terlambat",
+            y_title="Rata-Rata Rating (1-5 Bintang)",
             margin=dict(l=65, r=30, t=55, b=45),
         )
         fig_gap.update_layout(yaxis_range=[0, 5.4], showlegend=False)
@@ -596,26 +644,26 @@ with col_d1:
         p_late_1_val = (late_df["review_score"] == 1).mean() * 100 if not late_df.empty else 0.0
 
         df_prop = pd.DataFrame({
-            "Delivery Status": [
-                f"On-Time\n({fmt_number(n_ontime)} orders)",
-                f"Delayed\n({fmt_number(n_late)} orders)",
+            "Status Pengiriman": [
+                f"Tepat Waktu\n({fmt_number(n_ontime)} pesanan)",
+                f"Terlambat\n({fmt_number(n_late)} pesanan)",
             ],
-            "1-Star Review Share (%)": [p_ontime_1_val, p_late_1_val],
-            "Text": [f"{fmt_number(p_ontime_1_val, decimals=1)}%", f"{fmt_number(p_late_1_val, decimals=1)}%"],
+            "Proporsi Bintang 1 (%)": [p_ontime_1_val, p_late_1_val],
+            "Label": [f"{fmt_number(p_ontime_1_val, decimals=1)}%", f"{fmt_number(p_late_1_val, decimals=1)}%"],
         })
         fig_prop = px.bar(
             df_prop,
-            x="Delivery Status",
-            y="1-Star Review Share (%)",
-            text="Text",
-            color="Delivery Status",
+            x="Status Pengiriman",
+            y="Proporsi Bintang 1 (%)",
+            text="Label",
+            color="Status Pengiriman",
             color_discrete_sequence=["#10B981", "#EF4444"],
         )
         fig_prop.update_traces(textposition="outside", width=0.45)
         apply_plot_theme(
             fig_prop,
-            title="Share of 1-Star Reviews by Delivery Status",
-            y_title="Orders with 1-Star Review (%)",
+            title="Proporsi Ulasan Bintang 1 menurut Status Pengiriman",
+            y_title="Pesanan dengan Bintang 1 (%)",
             margin=dict(l=65, r=30, t=55, b=45),
         )
         fig_prop.update_layout(yaxis_range=[0, max(65, p_late_1_val * 1.15)], showlegend=False)
@@ -623,46 +671,46 @@ with col_d1:
         st.plotly_chart(fig_prop, width="stretch")
         if p_ontime_1_val > 0 and p_late_1_val > 0:
             st.caption(
-                f"Delayed orders receive 1-star reviews at {p_late_1_val / p_ontime_1_val:.1f}x the rate of on-time orders "
-                f"({fmt_number(p_late_1_val, decimals=1)}% vs {fmt_number(p_ontime_1_val, decimals=1)}%)."
+                f"Pesanan terlambat menerima ulasan bintang 1 sebesar {p_late_1_val / p_ontime_1_val:.1f}x lebih tinggi "
+                f"dibanding pesanan tepat waktu ({fmt_number(p_late_1_val, decimals=1)}% vs {fmt_number(p_ontime_1_val, decimals=1)}%)."
             )
         elif not late_df.empty:
-            st.caption(f"Delayed orders record a {fmt_number(p_late_1_val, decimals=1)}% 1-star review rate.")
+            st.caption(f"Proporsi ulasan bintang 1 pada pesanan terlambat mencapai {fmt_number(p_late_1_val, decimals=1)}%.")
 
     with tab_dist:
         dist_data = []
-        for status_label, sub_df in [("On-Time", ontime_df), ("Delayed", late_df)]:
+        for status_label, sub_df in [("Tepat Waktu", ontime_df), ("Terlambat", late_df)]:
             if not sub_df.empty:
                 counts = sub_df["review_score"].round().value_counts(normalize=True) * 100
                 for score in [1, 2, 3, 4, 5]:
                     pct_val = counts.get(float(score), 0.0)
                     dist_data.append({
-                        "Delivery Status": status_label,
-                        "Star Rating": f"{score} Star" if score == 1 else f"{score} Stars",
-                        "Percentage": round(pct_val, 1),
-                        "Label Text": f"{pct_val:.1f}%",
+                        "Status Pengiriman": status_label,
+                        "Skor Bintang": f"{score} Bintang",
+                        "Persentase": round(pct_val, 1),
+                        "Label": f"{pct_val:.1f}%",
                     })
 
         df_chart_dist = pd.DataFrame(dist_data)
         if not df_chart_dist.empty:
             fig_dist = px.bar(
                 df_chart_dist,
-                x="Star Rating",
-                y="Percentage",
-                color="Delivery Status",
+                x="Skor Bintang",
+                y="Persentase",
+                color="Status Pengiriman",
                 barmode="group",
-                color_discrete_map={"On-Time": "#10B981", "Delayed": "#EF4444"},
-                text="Label Text",
-                labels={"Percentage": "Share of Orders (%)", "Star Rating": "Review Rating"},
+                color_discrete_map={"Tepat Waktu": "#10B981", "Terlambat": "#EF4444"},
+                text="Label",
+                labels={"Persentase": "Proporsi Pesanan (%)", "Skor Bintang": "Skor Ulasan"},
             )
             fig_dist.update_traces(textposition="outside")
             apply_plot_theme(
                 fig_dist,
-                title="Review Rating Breakdown: On-Time vs Delayed",
-                y_title="Share of Orders (%)",
+                title="Distribusi Skor Ulasan: Tepat Waktu vs Terlambat",
+                y_title="Proporsi Pesanan (%)",
                 margin=dict(l=65, r=30, t=55, b=45),
             )
-            max_p = df_chart_dist["Percentage"].max()
+            max_p = df_chart_dist["Persentase"].max()
             fig_dist.update_layout(
                 yaxis_range=[0, max(75, max_p * 1.18)],
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -671,63 +719,63 @@ with col_d1:
             ontime_5star = (ontime_df["review_score"].round() == 5).mean() * 100 if not ontime_df.empty else 0.0
             late_1star_dist = (late_df["review_score"].round() == 1).mean() * 100 if not late_df.empty else 0.0
             st.caption(
-                f"On-time deliveries earn 5 stars in {fmt_number(ontime_5star, decimals=1)}% of orders, "
-                f"whereas delayed deliveries fall to 1 star in {fmt_number(late_1star_dist, decimals=1)}%."
+                f"Pesanan tepat waktu memperoleh 5 bintang pada {fmt_number(ontime_5star, decimals=1)}% pesanan, "
+                f"sedangkan pesanan terlambat turun ke 1 bintang pada {fmt_number(late_1star_dist, decimals=1)}%."
             )
         else:
-            st.info("No review ratings available for the current filter selection.")
+            st.info("Tidak ada data ulasan untuk pilihan filter saat ini.")
 
 with col_d2:
     if not df_reviewed.empty:
-        # Cap y-axis at 45 days (covers >95% of orders) to keep quartiles readable.
+        # Batasi sumbu Y pada 45 hari (mencakup >95% pesanan) agar kuartil boxplot terbaca jelas.
         fig_box = px.box(
             df_reviewed,
             x="review_score",
             y="actual_delivery_days",
-            labels={"review_score": "Review Score (1 to 5)", "actual_delivery_days": "Actual Delivery Time (Days)"},
+            labels={"review_score": "Skor Ulasan (1-5)", "actual_delivery_days": "Durasi Pengiriman Riil (Hari)"},
             points=False,
         )
         fig_box.update_traces(marker_color="#38BDF8")
         apply_plot_theme(
             fig_box,
-            title="Delivery Days Distribution by Review Score",
-            x_title="Customer Review Score (1 to 5)",
-            y_title="Delivery Time (Days)",
+            title="Sebaran Durasi Pengiriman per Skor Ulasan",
+            x_title="Skor Ulasan Pelanggan (1-5)",
+            y_title="Durasi Pengiriman (Hari)",
             margin=dict(l=65, r=30, t=55, b=45),
         )
         fig_box.update_layout(yaxis_range=[0, 45], showlegend=False)
         st.plotly_chart(fig_box, width="stretch")
-        st.caption("Y-axis capped at 45 days (covering over 95% of orders) to keep quartile comparisons readable.")
+        st.caption("Sumbu Y dibatasi 0-45 hari (mencakup lebih dari 95% pesanan) agar perbandingan kuartil tetap terbaca.")
     else:
-        st.info("No review data available to plot delivery duration quartiles.")
+        st.info("Tidak ada data ulasan untuk menampilkan sebaran durasi pengiriman.")
 
 c_m1, c_m2, c_m3 = st.columns(3)
 c_m1.metric(
-    "Satisfaction Gap",
-    f"-{fmt_number(satisfaction_gap, decimals=2)} stars" if satisfaction_gap is not None else "-",
-    help="Difference in mean review rating between on-time and delayed orders.",
+    "Selisih Kepuasan (Gap)",
+    f"-{fmt_number(satisfaction_gap, decimals=2)} bintang" if satisfaction_gap is not None else "-",
+    help="Selisih rata-rata skor ulasan antara pesanan tepat waktu dan terlambat.",
 )
 c_m2.metric(
-    "Delivery vs Rating Correlation",
+    "Korelasi Durasi vs Rating",
     f"r = {fmt_number(corr_pearson, decimals=3)}" if corr_pearson is not None else "-",
     help=(
         f"Pearson r = {fmt_number(corr_pearson, decimals=3)} | "
         f"Spearman r_s = {fmt_number(corr_spearman, decimals=3)} "
-        f"(n = {fmt_number(len(df_reviewed))} unique orders)."
-    ) if corr_pearson is not None else "Insufficient reviewed orders to compute correlation.",
+        f"(n = {fmt_number(len(df_reviewed))} pesanan unik)."
+    ) if corr_pearson is not None else "Jumlah ulasan tidak cukup untuk menghitung korelasi.",
 )
 c_m3.metric(
-    "Delivery Performance",
-    f"{fmt_number(on_time_pct, decimals=1)}% On-Time",
+    "Ketepatan Pengiriman",
+    f"{fmt_number(on_time_pct, decimals=1)}% Tepat Waktu",
     help=(
-        f"Out of {fmt_number(len(df_orders))} unique orders, {fmt_number(df_orders['is_delayed'].sum())} "
-        f"({fmt_number(df_orders['is_delayed'].mean() * 100, decimals=1)}%) arrived past the estimated date."
+        f"Dari {fmt_number(len(df_orders))} pesanan unik, {fmt_number(df_orders['is_delayed'].sum())} "
+        f"({fmt_number(df_orders['is_delayed'].mean() * 100, decimals=1)}%) tiba melewati tanggal estimasi."
     ),
 )
 
 on_time_str = f"{fmt_number(on_time_avg, decimals=2)} / 5.0" if on_time_avg is not None else "N/A"
 late_str = f"{fmt_number(late_avg, decimals=2)} / 5.0" if late_avg is not None else "N/A"
-gap_str = f"-{fmt_number(satisfaction_gap, decimals=2)} stars" if satisfaction_gap is not None else "N/A"
+gap_str = f"-{fmt_number(satisfaction_gap, decimals=2)} bintang" if satisfaction_gap is not None else "N/A"
 ontime_1star = fmt_number((ontime_df["review_score"] == 1).mean() * 100, decimals=1) if not ontime_df.empty else "0.0"
 late_1star = fmt_number((late_df["review_score"] == 1).mean() * 100, decimals=1) if not late_df.empty else "0.0"
 corr_p_str = fmt_number(corr_pearson, decimals=3) if corr_pearson is not None else "N/A"
@@ -736,12 +784,12 @@ corr_s_str = fmt_number(corr_spearman, decimals=3) if corr_spearman is not None 
 st.markdown(
     f"""
 <div class="insight-card">
-    <div class="insight-card-title">Key Insights: Delivery Timelines and Customer Satisfaction</div>
+    <div class="insight-card-title">Ringkasan Logistik & Kepuasan Pelanggan</div>
     <div class="insight-card-body">
         <ul>
-            <li>On-time orders average <b>{on_time_str}</b> compared to <b>{late_str}</b> for delayed orders (a gap of <b>{gap_str}</b>).</li>
-            <li>The 1-star review rate climbs from <b>{ontime_1star}%</b> on time to <b>{late_1star}%</b> when an order passes its estimated delivery date.</li>
-            <li>Longer delivery times correlate with lower ratings (Pearson r = {corr_p_str}, Spearman r_s = {corr_s_str}), with the promised arrival date acting as the main customer threshold.</li>
+            <li>Pesanan tepat waktu mencatat rata-rata <b>{on_time_str}</b> dibanding <b>{late_str}</b> pada pesanan terlambat (selisih <b>{gap_str}</b>).</li>
+            <li>Proporsi ulasan bintang 1 naik dari <b>{ontime_1star}%</b> saat tepat waktu menjadi <b>{late_1star}%</b> saat melewati tanggal estimasi.</li>
+            <li>Durasi kirim yang lebih lama berkorelasi negatif dengan skor ulasan (Pearson r = {corr_p_str}, Spearman r_s = {corr_s_str}), dengan tanggal estimasi sebagai batas toleransi pelanggan.</li>
         </ul>
     </div>
 </div>
@@ -751,8 +799,8 @@ st.markdown(
 
 st.markdown('<hr class="section-divider"/>', unsafe_allow_html=True)
 
-st.subheader("4. Business Recommendations")
-st.caption("Operational priorities for commercial, merchandising, and logistics teams.")
+st.subheader("4. Ide Tindak Lanjut & Keterbatasan Analisis")
+st.caption("Opsi tindak lanjut berbasis pola data teramati beserta batasan cakupan dataset.")
 
 col_a1, col_a2, col_a3 = st.columns(3)
 
@@ -760,11 +808,11 @@ with col_a1:
     st.markdown(
         f"""
     <div class="playbook-card">
-        <h4 class="playbook-title">Commercial & Growth</h4>
+        <h4 class="playbook-title">Komersial & Musiman</h4>
         <ul class="playbook-list">
-            <li>Launch pre-holiday promotions in October to build early demand and ease November Black Friday courier bottlenecks.</li>
-            <li>Focus revenue growth on customer acquisition and order volume, since AOV remains steady near {fmt_number(aov, is_currency=True, decimals=0)}.</li>
-            <li>Run re-engagement offers in December and January to convert first-time seasonal buyers into repeat customers.</li>
+            <li>Mulai promosi lebih awal pada Oktober untuk mengurai lonjakan permintaan sebelum puncak Black Friday November.</li>
+            <li>Arahkan pertumbuhan omset pada akuisisi pesanan baru karena AOV bertahan di kisaran {fmt_number(aov, is_currency=True, decimals=0)}.</li>
+            <li>Uji penawaran retensi pada Desember dan Januari untuk menjaga pembeli musiman tetap berbelanja ulang.</li>
         </ul>
     </div>
     """,
@@ -775,11 +823,11 @@ with col_a2:
     st.markdown(
         """
     <div class="playbook-card">
-        <h4 class="playbook-title">Product Portfolio & Merchandising</h4>
+        <h4 class="playbook-title">Portofolio & Merchandising</h4>
         <ul class="playbook-list">
-            <li>Protect inventory availability and primary storefront visibility for the core categories driving 80% of revenue.</li>
-            <li>Bundle high-frequency everyday items with higher-priced products to lift average basket value.</li>
-            <li>Audit low-turnover long-tail categories periodically to trim catalog overhead without affecting revenue.</li>
+            <li>Jaga ketersediaan stok dan penempatan utama untuk kelompok kategori inti penyumbang 80% omset.</li>
+            <li>Padukan produk berfrekuensi tinggi dengan barang bernilai lebih tinggi untuk mengangkat nilai keranjang belanja.</li>
+            <li>Evaluasi berkala kategori ekor panjang bervolume rendah agar pengelolaan katalog tetap efisien.</li>
         </ul>
     </div>
     """,
@@ -790,27 +838,33 @@ with col_a3:
     st.markdown(
         """
     <div class="playbook-card">
-        <h4 class="playbook-title">Logistics & Customer Experience</h4>
+        <h4 class="playbook-title">Logistik & SLA Pengiriman</h4>
         <ul class="playbook-list">
-            <li>Add a 2 to 3 day buffer to delivery estimates on long-distance routes so promised arrival dates remain realistic.</li>
-            <li>Send proactive delay alerts with updated tracking and goodwill credits as soon as transit exceptions occur.</li>
-            <li>Track merchant dispatch times and carrier SLA performance on high-delay corridors.</li>
+            <li>Tambahkan margin 2 sampai 3 hari pada estimasi rute jarak jauh agar tanggal janji tetap realistis.</li>
+            <li>Kirim pemberitahuan proaktif ketika pengiriman berisiko melewati estimasi untuk menekan keluhan bintang 1.</li>
+            <li>Pantau ketepatan waktu penjual dan kurir pada jalur dengan tingkat keterlambatan tinggi.</li>
         </ul>
     </div>
     """,
         unsafe_allow_html=True,
     )
 
+st.caption(
+    "Catatan keterbatasan: dataset hanya memuat pesanan berstatus delivered (Jan 2017 - Agu 2018), tidak menyertakan "
+    "customer_unique_id lintas transaksi sehingga analisis retensi/RFM tidak dilakukan, dan nilai pendapatan menggunakan "
+    "angka kotor item ditambah ongkos kirim tanpa data HPP atau diskon."
+)
+
 st.markdown('<hr class="section-divider"/>', unsafe_allow_html=True)
 
-st.subheader("5. Data Exploration and Export")
-st.caption("Inspect transaction samples, review summary tables, and download filtered CSV files.")
+st.subheader("5. Eksplorasi Data & Unduh CSV")
+st.caption("Periksa sampel transaksi terfilter, tabel ringkasan kategori, tren bulanan, dan ekspor CSV.")
 
-with st.expander("Open Data Exploration and CSV Export", expanded=False):
+with st.expander("Buka Tabel Ringkasan & Ekspor CSV", expanded=False):
     tab_sample, tab_cat_table, tab_monthly_table = st.tabs([
-        "Transaction Sample (10 Rows)",
-        "Category Summary",
-        "Monthly Trends",
+        "Sampel Transaksi (10 Baris)",
+        "Ringkasan Kategori",
+        "Tren Bulanan",
     ])
 
     with tab_sample:
@@ -828,20 +882,20 @@ with st.expander("Open Data Exploration and CSV Export", expanded=False):
         st.dataframe(df_filtered[display_cols].head(10), hide_index=True)
         csv_sample = df_filtered[display_cols].to_csv(index=False).encode("utf-8")
         st.download_button(
-            label="Download Filtered Transactions (CSV)",
+            label="Unduh Transaksi Terfilter (CSV)",
             data=csv_sample,
             file_name="filtered_ecommerce_transactions.csv",
             mime="text/csv",
-            help="Download filtered line items matching the active sidebar filters.",
+            help="Unduh baris item transaksi sesuai filter aktif di sidebar.",
         )
 
     with tab_cat_table:
         cat_export = cat_agg[["product_category_name_english", "total_revenue", "total_orders", "total_items", "aov", "cum_pct"]].copy()
-        cat_export.columns = ["Product Category", "Total Revenue (BRL)", "Total Orders", "Total Items", "AOV (BRL)", "Cumulative (%)"]
+        cat_export.columns = ["Kategori Produk", "Total Pendapatan (BRL)", "Jumlah Pesanan", "Jumlah Item", "AOV (BRL)", "Kumulatif (%)"]
         st.dataframe(cat_export.head(30), hide_index=True)
         csv_cat = cat_export.to_csv(index=False).encode("utf-8")
         st.download_button(
-            label="Download Category Pareto Summary (CSV)",
+            label="Unduh Ringkasan Pareto (CSV)",
             data=csv_cat,
             file_name="category_pareto_summary.csv",
             mime="text/csv",
@@ -849,30 +903,12 @@ with st.expander("Open Data Exploration and CSV Export", expanded=False):
 
     with tab_monthly_table:
         monthly_export = monthly_agg[["order_year_month", "revenue", "orders", "aov", "mom_growth"]].copy()
-        monthly_export.columns = ["Year-Month", "Net Revenue (BRL)", "Total Orders", "AOV (BRL)", "MoM Growth (%)"]
+        monthly_export.columns = ["Tahun-Bulan", "Pendapatan Bersih (BRL)", "Jumlah Pesanan", "AOV (BRL)", "Pertumbuhan MoM (%)"]
         st.dataframe(monthly_export, hide_index=True)
         csv_monthly = monthly_export.to_csv(index=False).encode("utf-8")
         st.download_button(
-            label="Download Monthly Trends (CSV)",
+            label="Unduh Tren Bulanan (CSV)",
             data=csv_monthly,
             file_name="monthly_revenue_trend.csv",
             mime="text/csv",
         )
-
-st.markdown(
-    """
-<div class="credit-container">
-    <div>
-        <div class="credit-author">Ilfa Antaries Yusuf Wijaya</div>
-        <div class="credit-role">E-Commerce Analytics Project</div>
-    </div>
-    <div class="credit-contact">
-        <span>Contact:</span>
-        <a href="mailto:contact.areswijaya@gmail.com" class="credit-email">contact.areswijaya@gmail.com</a>
-    </div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-st.caption("2026 E-Commerce Insight Dashboard. Built with Python, Streamlit, and Plotly.")

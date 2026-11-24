@@ -1,33 +1,28 @@
-"""Filter edge-case tests for the dashboard aggregation pipeline."""
+"""Pengujian skenario filter dan integrasi antarmuka Streamlit.
+
+Jalankan dari folder proyek: python -m unittest discover -s tests -v
+"""
 from datetime import date
-import pytest
+import unittest
+from pathlib import Path
+
 import pandas as pd
 
-
-@pytest.fixture(scope="module")
-def df_raw():
-    df = pd.read_csv("data/clean_orders.csv")
-    df["order_purchase_timestamp"] = pd.to_datetime(df["order_purchase_timestamp"])
-    df["order_delivered_customer_date"] = pd.to_datetime(df["order_delivered_customer_date"])
-    df["order_estimated_delivery_date"] = pd.to_datetime(df["order_estimated_delivery_date"])
-    df["is_delayed"] = df["is_delayed"].astype(bool)
-    return df
+BASE_DIR = Path(__file__).resolve().parents[1]
+DATA_PATH = BASE_DIR / "data" / "clean_orders.csv"
 
 
 def simulate_pipeline(df_raw, start_date, end_date, selected_categories):
-    """Mirror the filtering and aggregation logic used in dashboard.py."""
-    mask_date = (df_raw["order_purchase_timestamp"].dt.date >= start_date) & (df_raw["order_purchase_timestamp"].dt.date <= end_date)
+    """Meniru alur penyaringan dan agregasi metrik di dashboard.py."""
+    mask_date = (df_raw["order_purchase_timestamp"].dt.date >= start_date) & (
+        df_raw["order_purchase_timestamp"].dt.date <= end_date
+    )
     mask_cat = df_raw["product_category_name_english"].isin(selected_categories)
     df_filtered = df_raw[mask_date & mask_cat].copy()
     df_orders = df_filtered.drop_duplicates(subset=["order_id"]).copy()
 
     if df_filtered.empty or df_orders.empty:
-        return {
-            "empty": True,
-            "revenue": 0,
-            "orders": 0,
-            "aov": 0,
-        }
+        return {"empty": True, "revenue": 0, "orders": 0, "aov": 0}
 
     total_revenue = df_filtered["total_order_value"].sum()
     total_orders = df_orders["order_id"].nunique()
@@ -42,10 +37,7 @@ def simulate_pipeline(df_raw, start_date, end_date, selected_categories):
     )
 
     total_cats_count = len(cat_agg)
-    if total_cats_count <= 5:
-        top_n = total_cats_count
-    else:
-        top_n = min(15, total_cats_count)
+    top_n = total_cats_count if total_cats_count <= 5 else min(15, total_cats_count)
 
     df_reviewed = df_orders.dropna(subset=["review_score"]).copy()
     ontime_df = df_reviewed[~df_reviewed["is_delayed"]]
@@ -72,91 +64,90 @@ def simulate_pipeline(df_raw, start_date, end_date, selected_categories):
     }
 
 
-def test_scenario_1_all_categories(df_raw):
-    """Scenario 1: All 72 categories across the full date range."""
-    all_cats = df_raw["product_category_name_english"].dropna().unique().tolist()
-    start_d = df_raw["order_purchase_timestamp"].min().date()
-    end_d = df_raw["order_purchase_timestamp"].max().date()
+class DashboardScenariosTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.df_raw = pd.read_csv(DATA_PATH)
+        cls.df_raw["order_purchase_timestamp"] = pd.to_datetime(cls.df_raw["order_purchase_timestamp"])
+        cls.df_raw["order_delivered_customer_date"] = pd.to_datetime(cls.df_raw["order_delivered_customer_date"])
+        cls.df_raw["order_estimated_delivery_date"] = pd.to_datetime(cls.df_raw["order_estimated_delivery_date"])
+        cls.df_raw["is_delayed"] = cls.df_raw["is_delayed"].astype(bool)
+        cls.all_cats = cls.df_raw["product_category_name_english"].dropna().unique().tolist()
+        cls.min_date = cls.df_raw["order_purchase_timestamp"].min().date()
+        cls.max_date = cls.df_raw["order_purchase_timestamp"].max().date()
 
-    res = simulate_pipeline(df_raw, start_d, end_d, all_cats)
-    assert not res["empty"]
-    assert res["orders"] == 96203
-    assert res["top_n"] == 15
-    assert res["gap"] is not None
-    assert round(res["gap"], 2) == 2.02
+    # Skenario filter dashboard
+
+    def test_scenario_1_all_categories(self):
+        res = simulate_pipeline(self.df_raw, self.min_date, self.max_date, self.all_cats)
+        self.assertFalse(res["empty"])
+        self.assertEqual(res["orders"], 96203)
+        self.assertEqual(res["top_n"], 15)
+        self.assertIsNotNone(res["gap"])
+        self.assertEqual(round(res["gap"], 2), 2.02)
+
+    def test_scenario_2_single_category(self):
+        res = simulate_pipeline(self.df_raw, self.min_date, self.max_date, ["health_beauty"])
+        self.assertFalse(res["empty"])
+        self.assertEqual(res["top_n"], 1)
+        self.assertGreater(res["orders"], 0)
+        self.assertIsNotNone(res["gap"])
+
+    def test_scenario_3_four_categories(self):
+        cats = ["health_beauty", "watches_gifts", "bed_bath_table", "sports_leisure"]
+        res = simulate_pipeline(self.df_raw, self.min_date, self.max_date, cats)
+        self.assertFalse(res["empty"])
+        self.assertEqual(res["top_n"], 4)
+
+    def test_scenario_4_five_categories(self):
+        cats = ["health_beauty", "watches_gifts", "bed_bath_table", "sports_leisure", "computers_accessories"]
+        res = simulate_pipeline(self.df_raw, self.min_date, self.max_date, cats)
+        self.assertFalse(res["empty"])
+        self.assertEqual(res["top_n"], 5)
+
+    def test_scenario_5_six_categories(self):
+        cats = [
+            "health_beauty",
+            "watches_gifts",
+            "bed_bath_table",
+            "sports_leisure",
+            "computers_accessories",
+            "furniture_decor",
+        ]
+        res = simulate_pipeline(self.df_raw, self.min_date, self.max_date, cats)
+        self.assertFalse(res["empty"])
+        self.assertEqual(res["top_n"], 6)
+
+    def test_scenario_6_single_month(self):
+        res = simulate_pipeline(self.df_raw, date(2017, 11, 1), date(2017, 11, 30), self.all_cats)
+        self.assertFalse(res["empty"])
+        self.assertGreater(res["revenue"], 1_000_000)
+        self.assertGreater(res["orders"], 7000)
+
+    def test_scenario_7_single_date(self):
+        target_d = date(2017, 11, 24)
+        res = simulate_pipeline(self.df_raw, target_d, target_d, self.all_cats)
+        self.assertFalse(res["empty"])
+        self.assertGreater(res["orders"], 0)
+        self.assertGreater(res["revenue"], 0)
+
+    def test_scenario_8_empty_selection(self):
+        res = simulate_pipeline(self.df_raw, date(2025, 1, 1), date(2025, 1, 2), [])
+        self.assertTrue(res["empty"])
+        self.assertEqual(res["revenue"], 0)
+        self.assertEqual(res["orders"], 0)
+
+    def test_reset_filters_restores_empty_selection(self):
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(BASE_DIR / "dashboard" / "dashboard.py"), default_timeout=30).run()
+        at.sidebar.checkbox[0].uncheck().run()
+        at.sidebar.multiselect[0].set_value([]).run()
+        self.assertEqual(len(at.warning), 1)
+        at.sidebar.button(key="reset_filters_btn").click().run()
+        self.assertEqual(len(at.warning), 0)
+        self.assertTrue(at.sidebar.checkbox[0].value)
 
 
-def test_scenario_2_single_category(df_raw):
-    """Scenario 2: Single category (health_beauty)."""
-    start_d = df_raw["order_purchase_timestamp"].min().date()
-    end_d = df_raw["order_purchase_timestamp"].max().date()
-
-    res = simulate_pipeline(df_raw, start_d, end_d, ["health_beauty"])
-    assert not res["empty"]
-    assert res["top_n"] == 1
-    assert res["orders"] > 0
-    assert res["gap"] is not None
-
-
-def test_scenario_3_four_categories(df_raw):
-    """Scenario 3: 4 categories bypass the Top-N slider."""
-    cats = ["health_beauty", "watches_gifts", "bed_bath_table", "sports_leisure"]
-    start_d = df_raw["order_purchase_timestamp"].min().date()
-    end_d = df_raw["order_purchase_timestamp"].max().date()
-
-    res = simulate_pipeline(df_raw, start_d, end_d, cats)
-    assert not res["empty"]
-    assert res["top_n"] == 4
-
-
-def test_scenario_4_five_categories(df_raw):
-    """Scenario 4: 5 categories bypass the Top-N slider."""
-    cats = ["health_beauty", "watches_gifts", "bed_bath_table", "sports_leisure", "computers_accessories"]
-    start_d = df_raw["order_purchase_timestamp"].min().date()
-    end_d = df_raw["order_purchase_timestamp"].max().date()
-
-    res = simulate_pipeline(df_raw, start_d, end_d, cats)
-    assert not res["empty"]
-    assert res["top_n"] == 5
-
-
-def test_scenario_5_six_categories(df_raw):
-    """Scenario 5: 6 categories enable the Top-N slider with max=6."""
-    cats = ["health_beauty", "watches_gifts", "bed_bath_table", "sports_leisure", "computers_accessories", "furniture_decor"]
-    start_d = df_raw["order_purchase_timestamp"].min().date()
-    end_d = df_raw["order_purchase_timestamp"].max().date()
-
-    res = simulate_pipeline(df_raw, start_d, end_d, cats)
-    assert not res["empty"]
-    assert res["top_n"] == 6
-
-
-def test_scenario_6_single_month(df_raw):
-    """Scenario 6: Single month (November 2017 peak)."""
-    all_cats = df_raw["product_category_name_english"].dropna().unique().tolist()
-    start_d = date(2017, 11, 1)
-    end_d = date(2017, 11, 30)
-
-    res = simulate_pipeline(df_raw, start_d, end_d, all_cats)
-    assert not res["empty"]
-    assert res["revenue"] > 1_000_000
-    assert res["orders"] > 7000
-
-
-def test_scenario_7_single_date(df_raw):
-    """Scenario 7: Single day (2017-11-24 Black Friday)."""
-    all_cats = df_raw["product_category_name_english"].dropna().unique().tolist()
-    target_d = date(2017, 11, 24)
-
-    res = simulate_pipeline(df_raw, target_d, target_d, all_cats)
-    assert not res["empty"]
-    assert res["orders"] > 0
-    assert res["revenue"] > 0
-
-
-def test_scenario_8_empty_selection(df_raw):
-    """Scenario 8: Out-of-range dates and empty category list."""
-    res = simulate_pipeline(df_raw, date(2025, 1, 1), date(2025, 1, 2), [])
-    assert res["empty"]
-    assert res["revenue"] == 0
-    assert res["orders"] == 0
+if __name__ == "__main__":
+    unittest.main()
